@@ -1,0 +1,41 @@
+{
+  "name": "upright-desktop",
+  "productName": "Upright",
+  "version": "1.0.0",
+  "description": "Upright posture widget: a tiny always-on-top dot that warns you when you slouch.",
+  "author": "Oranges112",
+  "license": "MIT",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "set UPRIGHT_URL=http://localhost:3000/&& electron .",
+    "dist": "electron-builder --win portable nsis"
+  },
+  "build": {
+    "appId": "app.upright.desktop",
+    "productName": "Upright",
+    "files": [
+      "main.js",
+      "preload.js",
+      "icon.png"
+    ],
+    "win": {
+      "icon": "icon.png"
+    },
+    "portable": {
+      "artifactName": "Upright-Portable-${version}.exe"
+    },
+    "nsis": {
+      "artifactName": "Upright-Setup-${version}.exe",
+      "oneClick": true,
+      "perMachine": false
+    },
+    "directories": {
+      "output": "dist"
+    }
+  },
+  "devDependencies": {
+    "electron": "^45.2.3",
+    "electron-builder": "^26.18.0"
+  }
+}

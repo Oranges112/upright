@@ -1,11 +1,12 @@
 "use client";
 
 import { getMeta, setMeta } from "./store";
+import { asset } from "./base";
 
 export async function registerSW(): Promise<ServiceWorkerRegistration | null> {
   if (typeof window === "undefined" || !("serviceWorker" in navigator)) return null;
   try {
-    return await navigator.serviceWorker.register("/sw.js", { scope: "/" });
+    return await navigator.serviceWorker.register(asset("/sw.js"), { scope: asset("/") });
   } catch {
     return null;
   }
@@ -103,11 +104,11 @@ export async function localNotify(title: string, body: string) {
   const reg = await navigator.serviceWorker.getRegistration();
   const opts: NotificationOptions & { actions?: { action: string; title: string }[]; renotify?: boolean } = {
     body,
-    icon: "/icons/192",
-    badge: "/icons/96",
+    icon: asset("/icons/192.png"),
+    badge: asset("/icons/96.png"),
     tag: "upright-reminder",
     renotify: true,
-    data: { url: "/?start=default", code: getMeta().code },
+    data: { url: asset("/?start=default"), code: getMeta().code },
     actions: [
       { action: "start", title: "Start now" },
       { action: "snooze", title: "Snooze 30 min" },

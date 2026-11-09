@@ -2393,3 +2393,55 @@ button.link {
   color: #f87171;
   margin: 10px 0 0;
 }
+
+/* ---------------- desktop app widget: see-through dot that pops out into a pill ---------------- */
+
+.desktop-widget-body {
+  margin: 0;
+  overflow: hidden;
+  user-select: none;
+  background: transparent !important;
+}
+.mini-stage.desk {
+  height: 100vh;
+  padding: 3px;
+  background: transparent;
+  transition: opacity 0.4s ease;
+}
+.desk .mini-pill {
+  height: 100%;
+  max-height: none;
+  cursor: grab;
+  box-shadow:
+    0 2px 6px -2px color-mix(in srgb, var(--tone) 60%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18);
+}
+.desk .mini-pill:active {
+  cursor: grabbing;
+}
+.desk.dot .mini-pill {
+  flex: none;
+  aspect-ratio: 1;
+  width: auto;
+  padding: 0;
+  justify-content: center;
+  border-radius: 50%;
+}
+.desk.dot .mini-ring {
+  height: calc(100% - 6px);
+  max-height: none;
+  background: transparent;
+}
+/* fine (green) or idle (grey): fade into the background so it's not in the way */
+.desk.dot.tone-good,
+.desk.dot.tone-idle {
+  opacity: 0.5;
+}
+.desk.flip .mini-pill {
+  flex-direction: row-reverse;
+  padding: 0 6px 0 10px;
+  text-align: right;
+}
+.desk.flip .mini-text {
+  align-items: flex-end;
+}

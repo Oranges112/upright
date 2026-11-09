@@ -1,6 +1,8 @@
 /* Upright service worker: offline shell + push reminders */
-const CACHE = "upright-v1";
-const SHELL = ["/", "/manifest.webmanifest", "/icons/192", "/icons/512"];
+const CACHE = "upright-v2";
+// "" on Vercel, "/upright" on GitHub Pages: worked out from where this worker lives
+const BASE = new URL(self.registration.scope).pathname.replace(/\/$/, "");
+const SHELL = [`${BASE}/`, `${BASE}/manifest.webmanifest`, `${BASE}/icons/192.png`, `${BASE}/icons/512.png`];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -25,10 +27,10 @@ self.addEventListener("fetch", (event) => {
   const req = event.request;
   if (req.method !== "GET") return;
   const url = new URL(req.url);
-  if (url.origin !== self.location.origin || url.pathname.startsWith("/api/")) return;
+  if (url.origin !== self.location.origin || url.pathname.startsWith(`${BASE}/api/`)) return;
 
   // Hashed build assets: cache-first
-  if (url.pathname.startsWith("/_next/static/") || url.pathname.startsWith("/icons/")) {
+  if (url.pathname.startsWith(`${BASE}/_next/static/`) || url.pathname.startsWith(`${BASE}/icons/`)) {
     event.respondWith(
       caches.match(req).then(
         (hit) =>
@@ -49,10 +51,10 @@ self.addEventListener("fetch", (event) => {
       fetch(req)
         .then((res) => {
           const copy = res.clone();
-          caches.open(CACHE).then((c) => c.put("/", copy));
+          caches.open(CACHE).then((c) => c.put(`${BASE}/`, copy));
           return res;
         })
-        .catch(() => caches.match("/").then((r) => r || Response.error())),
+        .catch(() => caches.match(`${BASE}/`).then((r) => r || Response.error())),
     );
   }
 });
@@ -68,13 +70,13 @@ self.addEventListener("push", (event) => {
   event.waitUntil(
     self.registration.showNotification(title, {
       body: data.body || "A quick 2-minute routine. Sit tall and let's go.",
-      icon: "/icons/192",
-      badge: "/icons/96",
+      icon: `${BASE}/icons/192.png`,
+      badge: `${BASE}/icons/96.png`,
       tag: data.tag || "upright-reminder",
       renotify: true,
       requireInteraction: false,
       vibrate: [80, 60, 80],
-      data: { url: data.url || "/?start=default", code: data.code },
+      data: { url: data.url || `${BASE}/?start=default`, code: data.code },
       actions: [
         { action: "start", title: "▶ Start now" },
         { action: "snooze", title: "Snooze 30 min" },
@@ -94,7 +96,7 @@ self.addEventListener("notificationclick", (event) => {
         const all = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
         all.forEach((c) => c.postMessage({ type: "snooze", minutes: 30 }));
         if (data.code) {
-          await fetch("/api/snooze", {
+          await fetch(`${BASE}/api/snooze`, {
             method: "POST",
             headers: { "content-type": "application/json" },
             body: JSON.stringify({ code: data.code, minutes: 30 }),
@@ -105,7 +107,7 @@ self.addEventListener("notificationclick", (event) => {
     return;
   }
 
-  const target = data.url || "/";
+  const target = data.url || `${BASE}/`;
   event.waitUntil(
     (async () => {
       const all = await self.clients.matchAll({ type: "window", includeUncontrolled: true });

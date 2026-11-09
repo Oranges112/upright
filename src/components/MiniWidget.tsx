@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { BAD, ISSUE, guard } from "@/lib/guard";
 import { useDoc, useMeta } from "@/lib/store";
 import { useGuard } from "./GuardView";
+import { desktopBridge } from "@/lib/desktop";
 
 const TITLE: Record<string, string> = {
   off: "Posture Guard",
@@ -21,8 +22,13 @@ function fmtMin(sec: number) {
   return m < 60 ? `${m} min` : `${Math.floor(m / 60)}h ${m % 60}m`;
 }
 
-/** Tiny always-on-top posture pill. */
-export default function MiniWidget({ today }: { today: string }) {
+/**
+ * The floating posture widget.
+ *  - "pip": inside the browser's floating window (fixed size): always the full pill
+ *  - "desktop": inside the Upright desktop app: just a small see-through dot while you're fine,
+ *    popping out into a solid pill with the reason when something's wrong (or when you hover)
+ */
+export default function MiniWidget({ today, mode = "pip" }: { today: string; mode?: "pip" | "desktop" }) {
   const g = useGuard();
   const doc = useDoc();
   const meta = useMeta();
@@ -64,9 +70,15 @@ export default function MiniWidget({ today }: { today: string }) {
     tilt: { x: 0, y: 0, r: -22 * k },
   }[g.status as "forward"] ?? { x: 0, y: 0, r: 0 };
 
-  const title = issue ? issue.what : TITLE[g.status] ?? "";
+  const title = issue
+    ? issue.what
+    : g.status === "calibrating" && g.calibratingScreen === 2
+      ? "Screen 2: hold still"
+      : TITLE[g.status] ?? "";
   const sub = !running
-    ? "Tap to start"
+    ? g.status === "error" && g.error?.includes("busy")
+      ? "Camera busy in another app · tap to retry"
+      : "Tap to start"
     : flash && issue
       ? `${issue.fix} 🙆`
       : issue
@@ -87,41 +99,122 @@ export default function MiniWidget({ today }: { today: string }) {
                   ? "Come back when ready"
                   : "";
 
+  /* ---- desktop: dot vs. pill ---- */
+  const desktop = mode === "desktop";
+  const [hover, setHover] = useState(false);
+  const leaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const needsAttention = bad || flash || !running || g.status === "uncalibrated" || g.status === "calibrating" || g.status === "starting";
+  const expanded = !desktop || needsAttention || hover;
+  const [flip, setFlip] = useState(false);
+
+  useEffect(() => {
+    if (!desktop) return;
+    void desktopBridge()
+      ?.resize(expanded)
+      .then((r) => setFlip(!!r?.flip));
+  }, [desktop, expanded]);
+
+  useEffect(() => {
+    if (desktop) desktopBridge()?.setStatus({ tone, label: issue ? `${issue.what}: ${issue.fix}` : title });
+  }, [desktop, tone, title, issue]);
+
+  // desktop: drag the widget anywhere (a click that doesn't move still counts as a click)
+  const drag = useRef<{ sx: number; sy: number; x: number; y: number; moved: boolean } | null>(null);
+  const justDragged = useRef(false);
+  const onPointerDown = async (e: React.PointerEvent) => {
+    const b = desktopBridge();
+    if (!desktop || !b || e.button !== 0 || (e.target as HTMLElement).closest("button")) return;
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    const start = { sx: e.screenX, sy: e.screenY, x: 0, y: 0, moved: false };
+    drag.current = start;
+    const pos = await b.getPos();
+    start.x = pos.x;
+    start.y = pos.y;
+  };
+  const onPointerMove = (e: React.PointerEvent) => {
+    const d = drag.current;
+    if (!d || !desktop) return;
+    const dx = e.screenX - d.sx;
+    const dy = e.screenY - d.sy;
+    if (!d.moved && Math.hypot(dx, dy) < 4) return;
+    d.moved = true;
+    desktopBridge()?.moveTo(Math.round(d.x + dx), Math.round(d.y + dy));
+  };
+  const onPointerUp = () => {
+    const d = drag.current;
+    drag.current = null;
+    if (d?.moved) {
+      justDragged.current = true;
+      desktopBridge()?.dragEnd();
+      setTimeout(() => (justDragged.current = false), 50);
+    }
+  };
+
   const onMain = () => {
+    if (justDragged.current) return;
     if (!running) void guard.start();
     else if (g.status === "uncalibrated") guard.calibrate();
   };
 
+  const ringSvg = (
+    <svg className="mini-ring" viewBox="0 0 36 36" aria-hidden>
+      <circle cx="18" cy="18" r="15" className="track" />
+      <circle cx="18" cy="18" r="15" className="arc" strokeDasharray={C} strokeDashoffset={C * (1 - ring)} transform="rotate(-90 18 18)" />
+      <g className="mini-body">
+        <path d="M12 28 Q18 24.5 24 28" className="shoulders" />
+        <g style={{ transform: `translate(${head.x}px, ${head.y}px) rotate(${head.r}deg)`, transformOrigin: "18px 24px", transition: "transform .5s ease" }}>
+          <path d="M18 24 L18 19.5" className="neck" />
+          <circle cx="18" cy="15" r="4.4" className="head" />
+        </g>
+      </g>
+    </svg>
+  );
+
   return (
-    <div className={`mini-stage tone-${tone} ${flash ? "flash" : ""}`}>
-      <div className="mini-pill" onClick={onMain} title={!running ? "Start Posture Guard" : undefined}>
-        <svg className="mini-ring" viewBox="0 0 36 36" aria-hidden>
-          <circle cx="18" cy="18" r="15" className="track" />
-          <circle cx="18" cy="18" r="15" className="arc" strokeDasharray={C} strokeDashoffset={C * (1 - ring)} transform="rotate(-90 18 18)" />
-          <g className="mini-body">
-            <path d="M12 28 Q18 24.5 24 28" className="shoulders" />
-            <g style={{ transform: `translate(${head.x}px, ${head.y}px) rotate(${head.r}deg)`, transformOrigin: "18px 24px", transition: "transform .5s ease" }}>
-              <path d="M18 24 L18 19.5" className="neck" />
-              <circle cx="18" cy="15" r="4.4" className="head" />
-            </g>
-          </g>
-        </svg>
-        <div className="mini-text">
-          <b>{title}</b>
-          <span>{sub}</span>
-        </div>
-        {bad && chimeIn > 0 && <span className="mini-count">{chimeIn}s</span>}
-        {!bad && running && g.status !== "uncalibrated" && g.status !== "calibrating" && (
-          <button
-            className="mini-icon"
-            title="Recalibrate (sit tall first)"
-            onClick={(e) => {
-              e.stopPropagation();
-              guard.calibrate();
-            }}
-          >
-            ↺
-          </button>
+    <div
+      className={`mini-stage tone-${tone} ${flash ? "flash" : ""} ${desktop ? "desk" : ""} ${expanded ? "open" : "dot"} ${flip ? "flip" : ""}`}
+      onMouseEnter={() => {
+        if (leaveTimer.current) clearTimeout(leaveTimer.current);
+        setHover(true);
+      }}
+      onMouseLeave={() => {
+        leaveTimer.current = setTimeout(() => setHover(false), 500);
+      }}
+    >
+      <div
+        className="mini-pill"
+        onClick={onMain}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onContextMenu={(e) => {
+          if (!desktop) return;
+          e.preventDefault();
+          desktopBridge()?.contextMenu();
+        }}
+        title={!running ? "Start Posture Guard" : desktop ? "Drag to move · right-click for options" : undefined}
+      >
+        {ringSvg}
+        {expanded && (
+          <>
+            <div className="mini-text">
+              <b>{title}</b>
+              <span>{sub}</span>
+            </div>
+            {bad && chimeIn > 0 && <span className="mini-count">{chimeIn}s</span>}
+            {!bad && running && g.status !== "uncalibrated" && g.status !== "calibrating" && (
+              <button
+                className="mini-icon"
+                title="Recalibrate (sit tall first)"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  guard.calibrate();
+                }}
+              >
+                ↺
+              </button>
+            )}
+          </>
         )}
       </div>
     </div>

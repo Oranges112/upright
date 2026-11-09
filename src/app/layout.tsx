@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Outfit } from "next/font/google";
 import "./globals.css";
+import { asset } from "@/lib/base";
 
 const outfit = Outfit({ subsets: ["latin"], weight: ["300", "400", "500", "600", "700", "800"], display: "swap" });
 
@@ -10,8 +11,8 @@ export const metadata: Metadata = {
   applicationName: "Upright",
   appleWebApp: { capable: true, title: "Upright", statusBarStyle: "black-translucent" },
   icons: {
-    icon: [{ url: "/icons/192", type: "image/png", sizes: "192x192" }],
-    apple: [{ url: "/icons/180", sizes: "180x180" }],
+    icon: [{ url: asset("/icons/192.png"), type: "image/png", sizes: "192x192" }],
+    apple: [{ url: asset("/icons/180.png"), sizes: "180x180" }],
   },
   formatDetection: { telephone: false },
 };

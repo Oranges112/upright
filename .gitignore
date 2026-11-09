@@ -12,3 +12,6 @@ next-env.d.ts
 .env*
 
 .claude
+
+desktop/node_modules
+desktop/dist

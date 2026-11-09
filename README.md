@@ -16,7 +16,13 @@ A free, open-source posture coach that runs in your browser and installs like an
 
 <p align="center"><img src="docs/screenshots/desktop.png" width="90%" alt="Desktop view" /></p>
 
-> I built this because I have tech neck. It's free, has no account, no ads and no tracking. Host your own copy in about 10 minutes (guide below).
+## ▶️ Try it: [oranges112.github.io/upright](https://oranges112.github.io/upright/)
+
+Nothing to install or sign up for. Open the link on your phone or computer, and use your browser's **Install app** / **Add to Home Screen** to keep it like a normal app. Everything you do is saved privately in your own browser.
+
+> I built this because I have tech neck. It's free, has no account, no ads and no tracking.
+
+**The online version vs hosting your own:** the link above has everything (exercises, reminders while it's open, Posture Guard, the floating widget, progress and reports). Host your own copy (guide below, ~10 minutes) to also get **reminders when the app is closed** and **syncing between your phone and computer**.
 
 ## Features
 
@@ -32,6 +38,14 @@ A free, open-source posture coach that runs in your browser and installs like an
 | **📄 Before & after report** | Compares your first week with the last 7 days, with photos side by side. Print or save as PDF. |
 | **🔄 Sync without accounts** | Link your phone and computer with a private code; streaks merge automatically. Photos stay on the device. |
 | **🌙 Dark mode, offline, installable** | A PWA that works offline and installs from the browser. |
+
+## 🪟 Desktop widget (Windows)
+
+A tiny see-through dot that sits on top of every app. It's faded green while your posture is good, and pops out red with what's wrong ("Head forward · Slide your chin back") when you slouch. Drag it anywhere; right-click it (or the tray icon) to recalibrate, set up a second screen, pause, or open the full app.
+
+Download **Upright-Portable.exe** from [Releases](https://github.com/Oranges112/upright/releases) and double-click it. No install needed. Windows may warn that the app isn't from a known publisher, because it isn't code-signed: click **More info → Run anyway**.
+
+To build it yourself: `cd desktop && npm install && npm run dist`. To point it at your own copy of Upright (for sync), edit `url` in `%APPDATA%\Upright\config.json`.
 
 ## Host your own copy (about 10 minutes, free tiers)
 

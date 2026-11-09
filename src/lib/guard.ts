@@ -10,8 +10,9 @@
  * If either holds for a while, you get a gentle nudge.
  */
 
-import { addGuardTime, getMeta, setMeta } from "./store";
+import { addGuardTime, getMeta, setMeta, type GuardBase } from "./store";
 import { sound } from "./sound";
+import { asset } from "./base";
 
 export type GuardStatus =
   | "off"
@@ -57,6 +58,10 @@ export interface GuardState {
   oldCalibration: boolean;
   /** face is much further away than when calibrated: setup probably moved */
   moved: boolean;
+  /** which screen you're looking at (2 = second monitor, if calibrated) */
+  screen: 1 | 2;
+  /** which screen the current calibration is for */
+  calibratingScreen: 1 | 2;
   /** when the last nudge fired (widget flashes) */
   nudgedAt: number;
 }
@@ -156,7 +161,7 @@ class Guard {
   private lastFlush = 0;
 
   private fresh(): GuardState {
-    return { status: "off", stream: null, w: 0, cy: 0, drift: 0, badFor: 0, sessionGood: 0, sessionTotal: 0, sessionNudges: 0, calibrateLeft: 0, nudgedAt: 0, oldCalibration: false, moved: false };
+    return { status: "off", stream: null, w: 0, cy: 0, drift: 0, badFor: 0, sessionGood: 0, sessionTotal: 0, sessionNudges: 0, calibrateLeft: 0, nudgedAt: 0, oldCalibration: false, moved: false, screen: 1, calibratingScreen: 1 };
   }
 
   subscribe = (l: () => void) => {
@@ -208,6 +213,8 @@ class Guard {
           ? "Camera permission was blocked. Allow the camera for this site in your browser settings."
           : e?.name === "NotFoundError"
             ? "No camera found on this device."
+            : e?.name === "NotReadableError"
+              ? "Your camera is busy in another app (a video call, or Upright open in your browser). Close that, then try again."
             : "Couldn't start the camera or face tracker.";
       this.set({ status: "error", error: msg });
     }
@@ -245,12 +252,15 @@ class Guard {
     this.set({ ...this.fresh(), status: "off" });
   }
 
-  /** Sit tall, then call this: averages 3 seconds of measurements as your "good" posture. */
-  calibrate() {
+  /**
+   * Sit tall, then call this: averages 3 seconds of measurements as your "good" posture.
+   * screen 2 = while looking at your second monitor, so working there isn't "looking away".
+   */
+  calibrate(screen: 1 | 2 = 1) {
     if (!this.running) return;
     this.samples = [];
     this.calibrating = true;
-    this.set({ status: "calibrating", calibrateLeft: 3 });
+    this.set({ status: "calibrating", calibrateLeft: 3, calibratingScreen: screen });
     sound.next();
   }
 
@@ -264,7 +274,8 @@ class Guard {
       const xs = this.samples.map((x) => x[k]).filter((x): x is number => x != null);
       return xs.length ? median(xs) : undefined;
     };
-    setMeta({ guardBase: { w: med("w")!, cy: med("cy")!, cx: med("cx"), pitch: med("pitch"), roll: med("roll"), yaw: med("yaw"), at: Date.now() } });
+    const b: GuardBase = { w: med("w")!, cy: med("cy")!, cx: med("cx"), pitch: med("pitch"), roll: med("roll"), yaw: med("yaw"), at: Date.now() };
+    setMeta(this.state.calibratingScreen === 2 ? { guardBase2: b } : { guardBase: b });
     this.recent = [];
     this.set({ status: "good", calibrateLeft: 0, badFor: 0, oldCalibration: false, moved: false });
     sound.complete();
@@ -314,14 +325,20 @@ class Guard {
       return;
     }
 
-    const base = getMeta().guardBase;
-    if (!base) {
+    const meta = getMeta();
+    const base1 = meta.guardBase;
+    if (!base1) {
       this.set({ w: sw, cy: scy, status: "uncalibrated" });
       return;
     }
 
-    const t = THRESH[(getMeta().guardSensitivity ?? 2) as 1 | 2 | 3];
+    const t = THRESH[(meta.guardSensitivity ?? 2) as 1 | 2 | 3];
     const yaw = pick("yaw");
+    // Second monitor: judge you against whichever screen's calibration your head is turned toward.
+    const base2 = meta.guardBase2;
+    const near = (b?: GuardBase) => (b && yaw != null && b.yaw != null ? Math.abs(yaw - b.yaw) : Infinity);
+    const screen: 1 | 2 = base2 && near(base2) < near(base1) ? 2 : 1;
+    const base = screen === 2 ? base2! : base1;
     const pitch = pick("pitch");
     const roll = pick("roll");
 
@@ -375,7 +392,8 @@ class Guard {
       sessionGood,
       sessionTotal,
       sessionNudges,
-      oldCalibration: base.pitch == null,
+      oldCalibration: base1.pitch == null,
+      screen,
       moved: this.movedFor > 20,
     });
     if (Date.now() - this.lastFlush > 60_000) this.flush();
@@ -435,7 +453,7 @@ class Guard {
     try {
       if ("Notification" in window && Notification.permission === "granted") {
         const reg = await navigator.serviceWorker?.getRegistration();
-        const opts = { body: text, icon: "/icons/192", badge: "/icons/96", tag: "upright-guard", renotify: true, silent: false } as NotificationOptions;
+        const opts = { body: text, icon: asset("/icons/192.png"), badge: asset("/icons/96.png"), tag: "upright-guard", renotify: true, silent: false } as NotificationOptions;
         if (reg) await reg.showNotification(title, opts);
         else new Notification(title, opts);
       }

@@ -4,9 +4,21 @@ import { useSyncExternalStore } from "react";
 import type { CheckIn, Doc, GuardDay, PostureTest, SessionLog, Settings, TestType } from "./types";
 import { emptyDoc, mergeDocs, normalize } from "./merge";
 import { dayKey } from "./schedule";
+import { STATIC } from "./base";
 
 const KEY = "upright:v1";
 const META_KEY = "upright:meta";
+
+/** Your "sitting tall" measurements for one screen. */
+export interface GuardBase {
+  w: number;
+  cy: number;
+  at: number;
+  pitch?: number;
+  roll?: number;
+  yaw?: number;
+  cx?: number;
+}
 
 export interface Meta {
   code?: string;
@@ -18,7 +30,9 @@ export interface Meta {
   syncError?: string;
   deviceId?: string;
   /** Posture Guard calibration for this device's camera */
-  guardBase?: { w: number; cy: number; at: number; pitch?: number; roll?: number; yaw?: number; cx?: number };
+  guardBase?: GuardBase;
+  /** optional calibration while looking at a second monitor */
+  guardBase2?: GuardBase;
   guardSensitivity?: 1 | 2 | 3;
   guardDelaySec?: number;
 }
@@ -271,6 +285,7 @@ export async function initStore() {
   getDoc();
   getMeta();
   try {
+    if (STATIC) throw new Error("no server in the static build");
     const res = await fetch("/api/config", { cache: "no-store" });
     config = res.ok ? ((await res.json()) as ServerConfig) : { sync: false, push: false };
   } catch {

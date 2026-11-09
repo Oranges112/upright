@@ -104,7 +104,12 @@ export default function GuardView({ today }: { today: string }) {
               <video ref={videoRef} autoPlay muted playsInline />
               <div className={`cam-status tone-${ui.tone}`}>
                 <i />
-                {g.status === "calibrating" ? `Calibrating… ${Math.ceil(g.calibrateLeft)}` : ui.label}
+                {g.status === "calibrating"
+                  ? `${g.calibratingScreen === 2 ? "Screen 2: hold still" : "Calibrating"}… ${Math.ceil(g.calibrateLeft)}`
+                  : ui.label}
+                {meta.guardBase2 && running && g.status !== "calibrating" && g.status !== "away" && (
+                  <small className="cam-count">· 🖥️ {g.screen === 2 ? "Screen 2" : "Main screen"}</small>
+                )}
                 {bad && <small className="cam-count">· chime in {Math.max(0, Math.ceil(delay - g.badFor))}s</small>}
               </div>
               {g.status !== "uncalibrated" && g.status !== "calibrating" && g.status !== "away" && g.status !== "starting" && (
@@ -162,6 +167,37 @@ export default function GuardView({ today }: { today: string }) {
           </>
         )}
       </Card>
+
+      {running && meta.guardBase && (
+        <Card>
+          <h3 className="card-title">🖥️ Second screen</h3>
+          {meta.guardBase2 ? (
+            <>
+              <p className="row-hint" style={{ marginTop: 0 }}>
+                ✅ Set up. When you look at your second screen, Guard checks your posture against that position instead of saying you&apos;re looking
+                away.
+              </p>
+              <div className="btn-row">
+                <button className="btn ghost" onClick={() => guard.calibrate(2)} disabled={g.status === "calibrating"}>
+                  Recalibrate screen 2
+                </button>
+                <button className="btn ghost" onClick={() => setMeta({ guardBase2: undefined })}>
+                  Remove
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="row-hint" style={{ marginTop: 0 }}>
+                Use a second monitor? Turn to look at it, sit tall, and tap the button. Guard will then watch your posture on both screens.
+              </p>
+              <button className="btn primary" onClick={() => guard.calibrate(2)} disabled={g.status === "calibrating"}>
+                Calibrate my second screen
+              </button>
+            </>
+          )}
+        </Card>
+      )}
 
       <div className="stat-grid three">
         <div className="stat">

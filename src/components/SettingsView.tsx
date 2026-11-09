@@ -17,6 +17,7 @@ import {
 } from "@/lib/store";
 import { askPermission, disablePush, enablePush, isIOS, isStandalone, localNotify, notificationsSupported, sendTestPush } from "@/lib/push";
 import { sound } from "@/lib/sound";
+import { BASE, STATIC } from "@/lib/base";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -63,7 +64,7 @@ export default function SettingsView({ doc, meta, config, installPrompt }: { doc
     }
   }
 
-  const link = typeof window !== "undefined" && meta.code ? `${location.origin}/#link=${meta.code}` : "";
+  const link = typeof window !== "undefined" && meta.code ? `${location.origin}${BASE}/#link=${meta.code}` : "";
 
   return (
     <div className="view settings">
@@ -158,8 +159,12 @@ export default function SettingsView({ doc, meta, config, installPrompt }: { doc
                   ? "✅ Background reminders are on. They arrive even when Upright is closed."
                   : "Turn on to get reminders on this device, even when the app is closed."
                 : perm === "granted"
-                  ? "✅ On. Reminders show while Upright is open in a tab or window (background push isn't configured on this server)."
-                  : "Allow notifications so Upright can nudge you."}
+                  ? STATIC
+                    ? "✅ On. Reminders show while Upright is open in a tab or installed window. Keep it open in the background during your workday."
+                    : "✅ On. Reminders show while Upright is open in a tab or window (background push isn't configured on this server)."
+                  : STATIC
+                    ? "Allow notifications so Upright can nudge you while it's open in the background."
+                    : "Allow notifications so Upright can nudge you."}
             </p>
             <div className="btn-row">
               {!(perm === "granted" && (!config?.push || meta.pushOn)) && (
@@ -308,7 +313,20 @@ export default function SettingsView({ doc, meta, config, installPrompt }: { doc
             ) : null}
           </>
         ) : (
-          <p className="muted small">Sync isn&apos;t configured on this server yet, so data stays on this device. See the README to switch on Upstash.</p>
+          <p className="muted small">
+            {STATIC ? (
+              <>
+                Your progress is saved privately in this browser on this device. Nothing is sent anywhere. Use <b>Export backup</b> below to keep a
+                copy. Want phone and computer to share progress?{" "}
+                <a href="https://github.com/Oranges112/upright#host-your-own-copy-about-10-minutes-free-tiers" target="_blank" rel="noreferrer">
+                  Host your own copy
+                </a>
+                .
+              </>
+            ) : (
+              "Sync isn't configured on this server yet, so data stays on this device. See the README to switch on Upstash."
+            )}
+          </p>
         )}
       </Card>
 
