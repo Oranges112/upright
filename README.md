@@ -5,6 +5,7 @@ A free, open-source posture coach that runs in your browser and installs like an
 - It **reminds you** to take neck breaks as often as you choose.
 - It **does the exercises with you**, with an animated coach, countdowns, chimes and an optional voice.
 - Your **webcam can watch for slouching** while you work, with everything processed on your own device.
+- It has **gym workouts for posture** and a **Learn** section explaining every exercise.
 - It **tracks real progress**: streaks, a posture score, simple self-tests, and a before/after report you can show a physio.
 
 <p align="center">
@@ -30,6 +31,8 @@ Nothing to install or sign up for. Open the link on your phone or computer, and 
 |---|---|
 | **🏃 Guided routines** | Desk Quickie (~2 min), Stealth Mode (discreet, for the office), Desk Reset (~3 min), Full Fix (~8 min). 12 physio-style exercises: chin tucks, ear-to-shoulder, levator and upper-trap stretches, rotations, shoulder squeezes, W-to-Y, chest opener, back extension and more. |
 | **🎬 Exercises done with you** | An animated figure moves in sync with a countdown ring, rep dots and left/right switching. Gentle bell chimes, an optional ambient pad and voice coach. Keyboard shortcuts and screen wake-lock. |
+| **🏋️ Gym workouts** | Three posture plans (Upper back, Back + core & hips, Quick 20) with 12 animated gym moves: rows, face pulls, pulldowns, Y-raises, head lifts, glute bridges, dead bugs and stretches. Tap "Set done" for a rest timer, timed holds for stretches, and remembered weights. |
+| **📚 Learn** | Read about any exercise without doing it: how to do it, why it helps, where to feel it, common mistakes, easier and harder versions. Plus short guides on desk setup, phone posture, sleep, standing posture, gym rules, timelines and when to see a physio. |
 | **💪 Intensity levels** | Gentle → Athlete. Strength moves get longer holds and more reps, stretches stay capped at a safe 30 s, and mobility moves stay easy. After each session it asks "Too easy / Just right / Too hard" and adjusts. |
 | **🔔 Reminders** | Set the interval, active hours and days, with push notifications that have **Start now** and **Snooze** buttons. They work with the app closed, on phone and desktop. |
 | **🛡️ Posture Guard** | Your webcam spots a forward head, slumping, chin dropping and head tilt, then nudges you with a chime and notification. It ignores you glancing at another screen. Runs **100% on-device** (MediaPipe); no video ever leaves your computer. |

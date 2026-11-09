@@ -9,6 +9,9 @@ import Routines from "./Routines";
 import Progress from "./Progress";
 import SettingsView from "./SettingsView";
 import Player from "./Player";
+import Learn, { type LearnSection } from "./Learn";
+import GymSession from "./GymSession";
+import { getPlan } from "@/lib/gym";
 import GuardView, { STATUS_UI, useGuard } from "./GuardView";
 import { guard } from "@/lib/guard";
 import { Card } from "./ui";
@@ -19,8 +22,9 @@ import { todayKey } from "@/lib/stats";
 import { healPush, localNotify, notificationsSupported, registerSW, isIOS, isStandalone } from "@/lib/push";
 import { sound } from "@/lib/sound";
 import type { Routine } from "@/lib/types";
+import type { GymPlan } from "@/lib/gym";
 
-type Tab = "today" | "routines" | "guard" | "progress" | "settings";
+type Tab = "today" | "routines" | "learn" | "guard" | "progress" | "settings";
 
 const NAV: { id: Tab; label: string; icon: React.ReactNode }[] = [
   {
@@ -32,6 +36,11 @@ const NAV: { id: Tab; label: string; icon: React.ReactNode }[] = [
     id: "routines",
     label: "Routines",
     icon: <svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="2.5" /><path d="M12 8v6M8 21l4-7 4 7M6 11h12" /></svg>,
+  },
+  {
+    id: "learn",
+    label: "Learn",
+    icon: <svg viewBox="0 0 24 24"><path d="M4 5.5C4 4.7 4.7 4 5.5 4H11v16H5.5A1.5 1.5 0 014 18.5z" /><path d="M20 5.5c0-.8-.7-1.5-1.5-1.5H13v16h5.5a1.5 1.5 0 001.5-1.5z" /></svg>,
   },
   {
     id: "guard",
@@ -56,6 +65,8 @@ export default function App() {
   const config = useConfig();
   const [tab, setTab] = useState<Tab>("today");
   const [playing, setPlaying] = useState<Routine | null>(null);
+  const [gymPlan, setGymPlan] = useState<GymPlan | null>(null);
+  const [learnSection, setLearnSection] = useState<LearnSection>("desk");
   const [ready, setReady] = useState<Routine | null>(null);
   const [due, setDue] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -67,7 +78,7 @@ export default function App() {
   const guardState = useGuard();
   const widgetWin = useWidgetWindow();
 
-  useEffect(() => guard.setPaused(!!playing), [playing]);
+  useEffect(() => guard.setPaused(!!playing || !!gymPlan), [playing, gymPlan]);
 
   /* ---- theme ---- */
   const theme = doc.settings.theme ?? "system";
@@ -223,7 +234,20 @@ export default function App() {
         {mounted && tab === "today" && (
           <Today doc={doc} meta={meta} today={today} onStart={start} onOpenSettings={() => setTab("settings")} setupCard={setupCard} />
         )}
-        {mounted && tab === "routines" && <Routines onStart={start} />}
+        {mounted && tab === "routines" && (
+          <Routines
+            onStart={start}
+            onStartGym={(id) => {
+              sound.unlock();
+              setGymPlan(getPlan(id) ?? null);
+            }}
+            onLearn={(s) => {
+              setLearnSection(s);
+              setTab("learn");
+            }}
+          />
+        )}
+        {mounted && tab === "learn" && <Learn section={learnSection} onSection={setLearnSection} />}
         {mounted && tab === "guard" && <GuardView today={today} />}
         {mounted && tab === "progress" && <Progress doc={doc} today={today} />}
         {mounted && tab === "settings" && (
@@ -278,6 +302,7 @@ export default function App() {
       )}
       {widgetWin && createPortal(<MiniWidget today={today} />, widgetWin.document.body)}
 
+      {gymPlan && <GymSession key={gymPlan.id} plan={gymPlan} onClose={() => setGymPlan(null)} />}
       {playing && <Player key={playing.id} routine={playing} onClose={() => setPlaying(null)} />}
     </div>
   );

@@ -1,27 +1,39 @@
 "use client";
 
-import { COACHING } from "@/lib/coaching";
-import { useEffect, useState } from "react";
-import Figure from "./Figure";
-import { Card, Sheet } from "./ui";
+import { useState } from "react";
+import { Card } from "./ui";
 import { EXERCISES, ROUTINES, fmtDuration, routineSeconds } from "@/lib/exercises";
+import { GYM, GYM_PLANS, planItem, planSets, type GymExercise } from "@/lib/gym";
 import type { Exercise } from "@/lib/types";
 import { useDoc } from "@/lib/store";
+import { DeskDetail, GymDetail, type LearnSection } from "./Learn";
 
-/** A figure that loops through the exercise's phases forever. */
-export function LoopFigure({ ex, size }: { ex: Exercise; size?: number }) {
-  const [i, setI] = useState(0);
-  const poses = ex.cycle.length > 1 ? ex.cycle.map((c) => c.pose) : [{}, ex.cycle[0].pose];
-  useEffect(() => {
-    const t = setInterval(() => setI((x) => (x + 1) % poses.length), 1400);
-    return () => clearInterval(t);
-  }, [poses.length]);
-  return <Figure view={ex.view} pose={poses[i]} speed={1} size={size} />;
-}
-
-export default function Routines({ onStart }: { onStart: (id: string) => void }) {
+export default function Routines({
+  onStart,
+  onStartGym,
+  onLearn,
+}: {
+  onStart: (id: string) => void;
+  onStartGym: (id: string) => void;
+  onLearn: (s: LearnSection) => void;
+}) {
   const [openEx, setOpenEx] = useState<Exercise | null>(null);
+  const [openGym, setOpenGym] = useState<GymExercise | null>(null);
+  const [where, setWhere] = useState<"desk" | "gym">(() => {
+    try {
+      return localStorage.getItem("upright:routines-where") === "gym" ? "gym" : "desk";
+    } catch {
+      return "desk";
+    }
+  });
   const level = useDoc().settings.level;
+
+  function pick(w: "desk" | "gym") {
+    setWhere(w);
+    try {
+      localStorage.setItem("upright:routines-where", w);
+    } catch {}
+  }
 
   return (
     <div className="view routines">
@@ -32,93 +44,100 @@ export default function Routines({ onStart }: { onStart: (id: string) => void })
         </div>
       </header>
 
-      <div className="routine-list">
-        {ROUTINES.map((r) => (
-          <Card key={r.id} className="routine-card" style={{ ["--g1" as string]: r.gradient[0], ["--g2" as string]: r.gradient[1] }}>
-            <div className="rc-head">
-              <span className="rt-emoji big">{r.emoji}</span>
-              <div>
-                <h3>{r.name}</h3>
-                <p className="muted">{r.blurb}</p>
-              </div>
-            </div>
-            <div className="rc-chips">
-              {r.exercises.map((id, i) => (
-                <button key={id + i} className="ex-chip" onClick={() => setOpenEx(EXERCISES[id])}>
-                  {EXERCISES[id].name}
-                </button>
-              ))}
-            </div>
-            <div className="rc-foot">
-              <span className="muted">
-                ⏱ {fmtDuration(routineSeconds(r, level))} · {r.exercises.length} moves
-                {r.exercises.every((id) => EXERCISES[id].discreet) && " · office-friendly"}
-              </span>
-              <button className="btn primary" onClick={() => onStart(r.id)}>
-                ▶ Start
-              </button>
-            </div>
-          </Card>
-        ))}
+      <div className="seg-tabs" role="tablist">
+        <button role="tab" aria-selected={where === "desk"} className={where === "desk" ? "on" : ""} onClick={() => pick("desk")}>
+          🪑 At your desk
+        </button>
+        <button role="tab" aria-selected={where === "gym"} className={where === "gym" ? "on" : ""} onClick={() => pick("gym")}>
+          🏋️ At the gym
+        </button>
       </div>
 
-      <h3 className="section-title">Exercise library</h3>
-      <div className="ex-grid">
-        {Object.values(EXERCISES).map((ex) => (
-          <button key={ex.id} className="ex-tile" onClick={() => setOpenEx(ex)}>
-            <div className="ex-fig">
-              <LoopFigure ex={ex} />
-            </div>
-            <b>{ex.name}</b>
-            <small>{ex.targets}</small>
-          </button>
-        ))}
-      </div>
-
-      {openEx && (
-        <Sheet onClose={() => setOpenEx(null)}>
-          <div className="ex-detail">
-            <div className="ex-fig large">
-              <LoopFigure ex={openEx} />
-            </div>
-            <p className="eyebrow">{openEx.tagline}</p>
-            <h2>{openEx.name}</h2>
-            <p className="muted">Targets: {openEx.targets}{openEx.discreet ? " · can be done discreetly at your desk" : ""}</p>
-            <ol className="howto">
-              {openEx.howTo.map((h) => (
-                <li key={h}>{h}</li>
-              ))}
-            </ol>
-            {COACHING[openEx.id] && (
-              <div className="ex-coach">
-                <p>
-                  <b>💡 Why it helps</b>
-                  {COACHING[openEx.id].why}
-                </p>
-                <p>
-                  <b>🎯 Where you should feel it</b>
-                  {COACHING[openEx.id].feel}
-                </p>
+      {where === "desk" && (
+        <div className="routine-list">
+          {ROUTINES.map((r) => (
+            <Card key={r.id} className="routine-card" style={{ ["--g1" as string]: r.gradient[0], ["--g2" as string]: r.gradient[1] }}>
+              <div className="rc-head">
+                <span className="rt-emoji big">{r.emoji}</span>
                 <div>
-                  <b>✅ Get the most out of it</b>
-                  <ul>
-                    {COACHING[openEx.id].tips.map((t) => (
-                      <li key={t}>{t}</li>
-                    ))}
-                  </ul>
+                  <h3>{r.name}</h3>
+                  <p className="muted">{r.blurb}</p>
                 </div>
-                <p className="ex-avoid">
-                  <b>⚠️ Common mistake</b>
-                  {COACHING[openEx.id].avoid}
-                </p>
               </div>
-            )}
-            <button className="btn ghost wide" onClick={() => setOpenEx(null)}>
-              Close
-            </button>
-          </div>
-        </Sheet>
+              <div className="rc-chips">
+                {r.exercises.map((id, i) => (
+                  <button key={id + i} className="ex-chip" onClick={() => setOpenEx(EXERCISES[id])}>
+                    {EXERCISES[id].name}
+                  </button>
+                ))}
+              </div>
+              <div className="rc-foot">
+                <span className="muted">
+                  ⏱ {fmtDuration(routineSeconds(r, level))} · {r.exercises.length} moves
+                  {r.exercises.every((id) => EXERCISES[id].discreet) && " · office-friendly"}
+                </span>
+                <button className="btn primary" onClick={() => onStart(r.id)}>
+                  ▶ Start
+                </button>
+              </div>
+            </Card>
+          ))}
+        </div>
       )}
+
+      {where === "gym" && (
+        <>
+          <p className="muted small">
+            Gym plans for posture. Do one 2–3 times a week, alternating A and B. Tap any move to see how to do it.{" "}
+            <button className="link" onClick={() => onLearn("guides")}>
+              Read the gym rules →
+            </button>
+          </p>
+          <div className="routine-list">
+            {GYM_PLANS.map((p) => (
+              <Card key={p.id} className="routine-card" style={{ ["--g1" as string]: p.gradient[0], ["--g2" as string]: p.gradient[1] }}>
+                <div className="rc-head">
+                  <span className="rt-emoji big">{p.emoji}</span>
+                  <div>
+                    <h3>{p.name}</h3>
+                    <p className="muted">{p.blurb}</p>
+                  </div>
+                </div>
+                <div className="rc-chips">
+                  {p.items.map((it, i) => {
+                    const x = planItem(it);
+                    return (
+                      <button key={it.id + i} className="ex-chip" onClick={() => setOpenGym(GYM[it.id])}>
+                        {x.ex.name} <em>{x.sets}×{x.ex.hold ? `${x.ex.hold}s` : x.reps.split(" ")[0]}</em>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="rc-foot">
+                  <span className="muted">
+                    ⏱ ~{p.minutes} min · {p.items.length} moves · {planSets(p)} sets
+                  </span>
+                  <button className="btn primary" onClick={() => onStartGym(p.id)}>
+                    ▶ Start
+                  </button>
+                </div>
+              </Card>
+            ))}
+          </div>
+        </>
+      )}
+
+      <button className="learn-link card" onClick={() => onLearn(where)}>
+        <span className="guide-emoji sm">📚</span>
+        <span>
+          <b>Read about every exercise</b>
+          <small>How to do them, why they help, and common mistakes. No workout needed.</small>
+        </span>
+        <em>›</em>
+      </button>
+
+      {openEx && <DeskDetail ex={openEx} onClose={() => setOpenEx(null)} />}
+      {openGym && <GymDetail ex={openGym} onClose={() => setOpenGym(null)} />}
     </div>
   );
 }
