@@ -122,3 +122,20 @@ self.addEventListener("notificationclick", (event) => {
     })(),
   );
 });
+
+// Phones sometimes replace the push subscription behind our back: re-subscribe and tell the server.
+self.addEventListener("pushsubscriptionchange", (event) => {
+  event.waitUntil(
+    (async () => {
+      const old = event.oldSubscription;
+      const key = old && old.options && old.options.applicationServerKey;
+      if (!key) return;
+      const sub = event.newSubscription || (await self.registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key }));
+      await fetch(`${BASE}/api/push/resubscribe`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ oldEndpoint: old.endpoint, subscription: sub.toJSON() }),
+      }).catch(() => {});
+    })(),
+  );
+});

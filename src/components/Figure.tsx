@@ -2,6 +2,7 @@
 
 import { useId } from "react";
 import type { Pose, View } from "@/lib/types";
+import MoveArrows from "./MoveArrows";
 
 interface Props {
   view: View;
@@ -10,6 +11,8 @@ interface Props {
   speed?: number;
   size?: number;
   className?: string;
+  /** show arrows for which way to move (during the exercise itself) */
+  hints?: boolean;
 }
 
 const t = (x: number | undefined) => x ?? 0;
@@ -23,7 +26,7 @@ function tf(transform: string, ox: number, oy: number): React.CSSProperties {
   };
 }
 
-export default function Figure({ view, pose, speed = 0.9, size, className }: Props) {
+export default function Figure({ view, pose, speed = 0.9, size, className, hints = false }: Props) {
   const style = { ["--move" as string]: `${speed}s` } as React.CSSProperties;
   return (
     <svg
@@ -40,6 +43,7 @@ export default function Figure({ view, pose, speed = 0.9, size, className }: Pro
       </defs>
       <ellipse cx="120" cy="140" rx="118" ry="130" fill="url(#fig-glow)" />
       <g className="breathe">{view === "side" ? <Side pose={pose} /> : <Front pose={pose} />}</g>
+      {hints && <MoveArrows view={view} pose={pose} />}
     </svg>
   );
 }
@@ -63,7 +67,7 @@ function Side({ pose }: { pose: Pose }) {
           strokeWidth="1.6"
           strokeDasharray="4 5"
           className="ghost"
-          style={{ opacity: t(pose.hx) !== 0 ? 0.55 : 0 }}
+          style={{ opacity: t(pose.hx) !== 0 || Math.abs(t(pose.hr)) > 8 ? 0.55 : 0 }}
         />
         <g className="mv" style={tf(`translate(${t(pose.hx) * 1.45}px, ${t(pose.hy)}px)`, 0, 0)}>
           <path d="M103 164 L106 120 L126 120 L124 164 Z" fill="var(--fig-skin-2)" />

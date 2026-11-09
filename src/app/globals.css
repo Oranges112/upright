@@ -2477,3 +2477,254 @@ button.link {
 .desktop-dl-steps {
   margin: 0 0 10px;
 }
+
+/* ---------------- coaching tips in the player ---------------- */
+.why-line {
+  margin: 12px auto 0;
+  max-width: 440px;
+  font-size: 0.88rem;
+  line-height: 1.45;
+  color: #cbd5e1;
+  opacity: 0.9;
+  text-align: left;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.06);
+}
+.why-line b {
+  color: #5eead4;
+}
+.tip-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  max-width: 440px;
+  margin: 14px auto 0;
+  padding: 11px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.07);
+  color: #e2e8f0;
+  font: inherit;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  text-align: left;
+  cursor: pointer;
+  animation: tip-in 0.45s ease both;
+}
+.tip-icon {
+  flex: none;
+  font-size: 1.05rem;
+  line-height: 1.3;
+}
+@keyframes tip-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@media (max-height: 700px) {
+  .why-line {
+    font-size: 0.8rem;
+    padding: 8px 12px;
+  }
+  .tip-card {
+    margin-top: 8px;
+    padding: 8px 12px;
+    font-size: 0.86rem;
+  }
+}
+.ex-coach {
+  display: grid;
+  gap: 12px;
+  margin: 4px 0 18px;
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+.ex-coach p,
+.ex-coach div {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--card-2);
+  border: 1px solid var(--border);
+}
+.ex-coach b {
+  display: block;
+  margin-bottom: 4px;
+}
+.ex-coach ul {
+  margin: 0;
+  padding-left: 18px;
+}
+.ex-coach li + li {
+  margin-top: 3px;
+}
+.ex-coach .ex-avoid {
+  border-color: color-mix(in srgb, #f59e0b 40%, var(--border));
+}
+/* front-view moves use the full width: tuck the countdown below the figure's arm */
+.player-stage.view-front .stage-ring {
+  right: -26px;
+  bottom: -40px;
+  transform: scale(0.82);
+  transform-origin: bottom right;
+}
+
+/* ---------------- mirror + form check ---------------- */
+.stage-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  width: 100%;
+}
+.stage-row.with-mirror .player-stage {
+  width: min(44vw, 34dvh, 300px);
+}
+.stage-row.with-mirror .stage-ring {
+  transform: scale(0.72);
+  transform-origin: bottom right;
+}
+.mirror {
+  position: relative;
+  width: min(42vw, 34dvh, 300px);
+  aspect-ratio: 3 / 4;
+  border-radius: 24px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+.mirror video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+  display: block;
+}
+.mirror-fb {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: 8px;
+  padding: 7px 10px;
+  border-radius: 12px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: white;
+  background: rgba(15, 23, 42, 0.72);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  transition: background 0.3s ease;
+}
+.mirror-fb.tone-good {
+  background: rgba(16, 185, 129, 0.85);
+}
+.mirror-fb.tone-warn {
+  background: rgba(217, 119, 6, 0.85);
+}
+.mirror-fb.tone-bad {
+  background: rgba(225, 29, 72, 0.88);
+}
+.mirror-score {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 3px 9px;
+  border-radius: 99px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: white;
+  background: rgba(16, 185, 129, 0.85);
+}
+.icon-btn.on {
+  color: #34d399;
+}
+.finish-form {
+  margin: 14px 0 0;
+  text-align: center;
+  color: #cbd5e1;
+}
+@media (min-width: 900px) {
+  .stage-row.with-mirror .player-stage,
+  .mirror {
+    width: min(30vw, 42dvh, 340px);
+  }
+}
+
+/* which-way-to-move arrows on the coach figure */
+.figure .move-arrows {
+  filter: drop-shadow(0 0 4px color-mix(in srgb, var(--accent) 70%, transparent));
+  animation: arrows-in 0.5s ease both, arrows-pulse 1.6s ease-in-out 0.5s infinite;
+}
+@keyframes arrows-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes arrows-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/* ---------------- notification health check ---------------- */
+.notif-check h2 {
+  margin: 0 0 4px;
+}
+.nc-list {
+  list-style: none;
+  padding: 0;
+  margin: 14px 0;
+  display: grid;
+  gap: 10px;
+}
+.nc-list li {
+  display: flex;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--card-2);
+  border: 1px solid var(--border);
+}
+.nc-list li.nc-fail {
+  border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
+}
+.nc-list li.nc-warn {
+  border-color: color-mix(in srgb, #f59e0b 45%, var(--border));
+}
+.nc-list p {
+  margin: 4px 0 0;
+  font-size: 0.86rem;
+  color: var(--muted);
+}
+.nc-list .btn {
+  margin-top: 8px;
+}
+.nc-icon {
+  flex: none;
+}
+.nc-allgood {
+  font-weight: 600;
+  color: var(--good);
+}
+.nc-ask {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--card-2);
+  font-size: 0.9rem;
+}
+.nc-ask p {
+  margin: 0 0 8px;
+}
+.nc-ask ul {
+  margin: 0;
+  padding-left: 18px;
+}
+.btn.small {
+  padding: 6px 14px;
+  font-size: 0.85rem;
+}

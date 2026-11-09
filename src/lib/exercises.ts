@@ -73,7 +73,7 @@ export const EXERCISES: Record<string, Exercise> = {
     cue: "Gentle stretch down the back of the neck.",
     sides: true,
     reps: 1,
-    cycle: [{ label: "Hold", sec: 20, pose: { hr: 14, fx: 9, fy: 11 } }],
+    cycle: [{ label: "Hold", sec: 20, pose: { hr: 16, fx: 13, fy: 17, hand: "left" } }],
     discreet: false,
     targets: "Levator scapulae",
   },
@@ -108,8 +108,8 @@ export const EXERCISES: Record<string, Exercise> = {
     sides: false,
     reps: 4,
     cycle: [
-      { label: "Look up", sec: 3, pose: { hr: -20 } },
-      { label: "Look down", sec: 3, pose: { hr: 22 } },
+      { label: "Look up", sec: 3, pose: { hr: -26 } },
+      { label: "Look down", sec: 3, pose: { hr: 28 } },
     ],
     discreet: true,
     targets: "Neck mobility",
@@ -128,7 +128,7 @@ export const EXERCISES: Record<string, Exercise> = {
     sides: false,
     reps: 8,
     cycle: [
-      { label: "Squeeze", sec: 3, pose: { sx: -8, tr: -2, arm: -8 } },
+      { label: "Squeeze", sec: 3, pose: { sx: -12, tr: -3, arm: -12 } },
       { label: "Release", sec: 2, pose: {} },
     ],
     discreet: true,

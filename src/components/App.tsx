@@ -13,10 +13,10 @@ import GuardView, { STATUS_UI, useGuard } from "./GuardView";
 import { guard } from "@/lib/guard";
 import { Card } from "./ui";
 import { getRoutine, fmtDuration, routineSeconds } from "@/lib/exercises";
-import { getDoc, getMeta, initStore, lastSessionEnd, linkDevice, cleanCode, setMeta, snooze, useConfig, useDoc, useMeta } from "@/lib/store";
+import { getConfig, getDoc, getMeta, initStore, lastSessionEnd, linkDevice, cleanCode, setMeta, snooze, useConfig, useDoc, useMeta } from "@/lib/store";
 import { isReminderDue } from "@/lib/schedule";
 import { todayKey } from "@/lib/stats";
-import { localNotify, notificationsSupported, registerSW, isIOS, isStandalone } from "@/lib/push";
+import { healPush, localNotify, notificationsSupported, registerSW, isIOS, isStandalone } from "@/lib/push";
 import { sound } from "@/lib/sound";
 import type { Routine } from "@/lib/types";
 
@@ -81,7 +81,11 @@ export default function App() {
   /* ---- boot ---- */
   useEffect(() => {
     setMounted(true);
-    void initStore();
+    void initStore().then(() => {
+      // keep background reminders working if the phone dropped this device's subscription
+      const c = getConfig();
+      if (c?.push && c.vapidPublicKey) void healPush(c.vapidPublicKey);
+    });
     void registerSW();
     setPerm(notificationsSupported() ? Notification.permission : "unsupported");
 

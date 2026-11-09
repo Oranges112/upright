@@ -1,6 +1,7 @@
 "use client";
 
 import DesktopDownload from "./DesktopDownload";
+import NotifCheck from "./NotifCheck";
 import { useEffect, useState } from "react";
 import { Card, Chips, Toggle, hourLabel } from "./ui";
 import { LEVEL_INFO, ROUTINES, buildTimeline, getRoutine, type Level } from "@/lib/exercises";
@@ -27,6 +28,7 @@ export default function SettingsView({ doc, meta, config, installPrompt }: { doc
   const [perm, setPerm] = useState<NotificationPermission | "unsupported">("default");
   const [msg, setMsg] = useState<string | null>(null);
   const [linkInput, setLinkInput] = useState("");
+  const [checkOpen, setCheckOpen] = useState(false);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -189,6 +191,9 @@ export default function SettingsView({ doc, meta, config, installPrompt }: { doc
                   Turn off here
                 </button>
               )}
+              <button className="btn ghost" onClick={() => setCheckOpen(true)}>
+                🩺 Check my notifications
+              </button>
             </div>
             {perm === "denied" && <p className="row-hint">Notifications are blocked. Re-enable them in your browser&apos;s site settings.</p>}
           </>
@@ -352,6 +357,7 @@ export default function SettingsView({ doc, meta, config, installPrompt }: { doc
       </Card>
 
       <DesktopDownload />
+      {checkOpen && <NotifCheck onClose={() => setCheckOpen(false)} />}
 
       <Card>
         <h3 className="card-title">🗂 Data</h3>

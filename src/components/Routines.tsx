@@ -1,5 +1,6 @@
 "use client";
 
+import { COACHING } from "@/lib/coaching";
 import { useEffect, useState } from "react";
 import Figure from "./Figure";
 import { Card, Sheet } from "./ui";
@@ -88,6 +89,30 @@ export default function Routines({ onStart }: { onStart: (id: string) => void })
                 <li key={h}>{h}</li>
               ))}
             </ol>
+            {COACHING[openEx.id] && (
+              <div className="ex-coach">
+                <p>
+                  <b>💡 Why it helps</b>
+                  {COACHING[openEx.id].why}
+                </p>
+                <p>
+                  <b>🎯 Where you should feel it</b>
+                  {COACHING[openEx.id].feel}
+                </p>
+                <div>
+                  <b>✅ Get the most out of it</b>
+                  <ul>
+                    {COACHING[openEx.id].tips.map((t) => (
+                      <li key={t}>{t}</li>
+                    ))}
+                  </ul>
+                </div>
+                <p className="ex-avoid">
+                  <b>⚠️ Common mistake</b>
+                  {COACHING[openEx.id].avoid}
+                </p>
+              </div>
+            )}
             <button className="btn ghost wide" onClick={() => setOpenEx(null)}>
               Close
             </button>

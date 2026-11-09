@@ -5,6 +5,9 @@ import Figure from "./Figure";
 import Ring from "./Ring";
 import { EXERCISES, LEVEL_INFO, buildTimeline, fmtClock, type Level, type Step } from "@/lib/exercises";
 import type { Routine } from "@/lib/types";
+import { COACHING, workTips } from "@/lib/coaching";
+import { Mirror, useFormCheck } from "./FormCheck";
+
 import { sound, speak, stopSpeaking } from "@/lib/sound";
 import { addCheckin, getDoc, logSession, updateSettings } from "@/lib/store";
 import { currentStreak, levelFor, todayKey, totalXp } from "@/lib/stats";
@@ -26,9 +29,10 @@ export default function Player({ routine, onClose }: Props) {
   const [remaining, setRemaining] = useState(steps[0]?.sec ?? 0);
   const [paused, setPaused] = useState(false);
   const [muted, setMuted] = useState(() => !getDoc().settings.sound);
-  const [finished, setFinished] = useState<null | { completed: boolean; xp: number; streak: number; levelUp: boolean; level: ReturnType<typeof levelFor> }>(null);
+  const [finished, setFinished] = useState<null | FinishResult>(null);
   const [confirmExit, setConfirmExit] = useState(false);
   const [demoFlip, setDemoFlip] = useState(false);
+  const [tipBump, setTipBump] = useState(0);
 
   const startedAt = useRef(Date.now());
   const workedMs = useRef(0);
@@ -42,6 +46,34 @@ export default function Player({ routine, onClose }: Props) {
 
   const step: Step | undefined = steps[idx];
   const ex = step ? EXERCISES[step.exerciseId] : undefined;
+
+  /* ---- mirror + camera form check ---- */
+  const [mirrorOn, setMirrorOn] = useState(() => {
+    try {
+      return localStorage.getItem("upright:mirror") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const toggleMirror = () =>
+    setMirrorOn((m) => {
+      try {
+        localStorage.setItem("upright:mirror", m ? "0" : "1");
+      } catch {}
+      return !m;
+    });
+  const fc = useFormCheck(mirrorOn, step, idx, paused);
+  const formRef = useRef(fc.session);
+  formRef.current = fc.session;
+  // say it out loud when form slips (at most every 8 s)
+  const lastSaid = useRef(0);
+  useEffect(() => {
+    const fb = fc.feedback;
+    if (!fb || fb.tone !== "bad" || !voiceOn || muted || paused) return;
+    if (Date.now() - lastSaid.current < 8000) return;
+    lastSaid.current = Date.now();
+    speak(fb.text);
+  }, [fc.feedback, voiceOn, muted, paused]);
 
   /* ---- announce a step (sound + voice + haptics) ---- */
   const announce = useCallback(
@@ -63,7 +95,10 @@ export default function Player({ routine, onClose }: Props) {
       } else {
         SOFT_LABELS.has(s.label) ? sound.phaseOut() : sound.phaseIn();
         if (voiceOn && !muted && s.sec >= 2) {
-          if (s.label === "Hold") speak(`Hold for ${s.sec} seconds. ${s.side ? "" : e.cue}`);
+          const tips = COACHING[e.id]?.tips ?? [];
+          const tip = tips.length ? tips[(s.rep + (s.side === "right" ? 1 : 0) + i) % tips.length] : e.cue;
+          if (s.label === "Hold") speak(`Hold for ${s.sec} seconds. ${tip}`);
+          else if (s.rep === 3 && s.label === e.cycle[0].label && s.reps > 3) speak(`${s.label}. ${tip}`);
           else if (s.sec >= 3 || s.rep === 1) speak(s.label);
         }
       }
@@ -85,6 +120,7 @@ export default function Player({ routine, onClose }: Props) {
     const levelAfter = levelFor(totalXp(after));
     const levelUp = levelAfter.index > levelBefore.index;
     setFinished({
+      form: formRef.current.total ? { ...formRef.current } : undefined,
       completed,
       xp: levelAfter.xp - levelBefore.xp,
       streak: currentStreak(after, today),
@@ -257,6 +293,19 @@ export default function Player({ routine, onClose }: Props) {
   if (!step || !ex) return null;
 
   const elapsedTotal = steps.slice(0, idx).reduce((a, s) => a + s.sec, 0) + (step.sec - remaining);
+  // coaching cards rotate while you work, each shown long enough to read (tap the card to skip ahead)
+  const exStart = steps.findIndex((s) => s.exIndex === step.exIndex);
+  const prepSec = steps[exStart]?.kind === "prep" ? steps[exStart].sec : 0;
+  const workElapsed = Math.max(0, elapsedTotal - steps.slice(0, exStart).reduce((a, s) => a + s.sec, 0) - prepSec);
+  const tips = workTips(ex.id);
+  const durs = tips.map((t) => Math.max(5, t.text.split(" ").length / 2.5));
+  let tipIdx = 0;
+  if (tips.length) {
+    let t = workElapsed % durs.reduce((a, d) => a + d, 0);
+    while (t >= durs[tipIdx]) t -= durs[tipIdx++];
+    tipIdx = (tipIdx + tipBump) % tips.length;
+  }
+  const tip = tips[tipIdx];
   const phaseProgress = 1 - remaining / step.sec;
   const nextEx = EXERCISES[routine.exercises[step.exIndex + 1]];
   const demoPose = step.kind === "prep" ? (demoFlip ? ex.cycle[0].pose : {}) : step.pose;
@@ -277,6 +326,14 @@ export default function Player({ routine, onClose }: Props) {
             </span>
           ))}
         </div>
+        <button
+          className={`icon-btn ${mirrorOn ? "on" : ""}`}
+          onClick={toggleMirror}
+          aria-label={mirrorOn ? "Turn off mirror and form check" : "Turn on mirror and form check"}
+          title={mirrorOn ? "Mirror & form check: on" : "Mirror & form check"}
+        >
+          <svg viewBox="0 0 24 24" width="22" height="22"><path d="M4 8a2 2 0 012-2h2l1.5-2h5L16 6h2a2 2 0 012 2v9a2 2 0 01-2 2H6a2 2 0 01-2-2z" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" /><circle cx="12" cy="12.5" r="3.4" fill="none" stroke="currentColor" strokeWidth="1.8" />{mirrorOn && <circle cx="19" cy="5" r="3" fill="#34d399" stroke="none" />}</svg>
+        </button>
         <button className="icon-btn" onClick={toggleMute} aria-label={muted ? "Unmute" : "Mute"}>
           {muted ? (
             <svg viewBox="0 0 24 24" width="22" height="22"><path d="M4 9h4l5-4v14l-5-4H4z" fill="currentColor" /><path d="M17 9l4 6M21 9l-4 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
@@ -292,15 +349,18 @@ export default function Player({ routine, onClose }: Props) {
       </div>
 
       <main className="player-main">
-        <div className="player-stage">
+        <div className={`stage-row ${mirrorOn ? "with-mirror" : ""}`}>
+        <div className={`player-stage view-${ex.view}`}>
           <div className={`figure-wrap ${step.kind}`}>
-            <Figure view={ex.view} pose={demoPose} speed={moveSpeed} />
+            <Figure view={ex.view} pose={demoPose} speed={moveSpeed} hints={step.kind === "work"} />
           </div>
           <div className="stage-ring">
             <Ring progress={phaseProgress} size={132} stroke={9} colors={[routine.gradient[0], routine.gradient[1]]}>
               <div className={`count ${remaining <= 3.05 && step.sec >= 4 ? "pulse" : ""}`}>{Math.max(0, Math.ceil(remaining))}</div>
             </Ring>
           </div>
+        </div>
+        {mirrorOn && <Mirror fc={fc} exerciseId={ex.id} />}
         </div>
 
         <div className="player-text">
@@ -336,6 +396,12 @@ export default function Player({ routine, onClose }: Props) {
                   <p className="cue">{ex.cue}</p>
                 )}
               </div>
+              {tip && (
+                <button key={`${step.exIndex}-${tipIdx}`} className="tip-card" onClick={() => setTipBump((b) => b + 1)} title="Next tip">
+                  <span className="tip-icon">{tip.icon}</span>
+                  <span>{tip.text}</span>
+                </button>
+              )}
             </>
           )}
         </div>
@@ -393,13 +459,23 @@ function segProgress(steps: Step[], idx: number, remaining: number) {
 
 const FEEL = ["😌", "🙂", "😐", "😕", "😣"];
 
+interface FinishResult {
+  completed: boolean;
+  xp: number;
+  streak: number;
+  levelUp: boolean;
+  level: ReturnType<typeof levelFor>;
+  /** reps the camera judged, if mirror was on */
+  form?: { good: number; total: number };
+}
+
 function Finish({
   routine,
   result,
   onClose,
 }: {
   routine: Routine;
-  result: { completed: boolean; xp: number; streak: number; levelUp: boolean; level: ReturnType<typeof levelFor> };
+  result: FinishResult;
   onClose: () => void;
 }) {
   const [picked, setPicked] = useState<number | null>(null);
@@ -450,6 +526,12 @@ function Finish({
             <span>{result.level.name}</span>
           </div>
         </div>
+        {result.form && (
+          <p className="finish-form">
+            📷 Form check: <b>{result.form.good}</b> of {result.form.total} moves on point
+            {result.form.total > 0 && result.form.good / result.form.total >= 0.8 ? " · great technique!" : ""}
+          </p>
+        )}
 
         <div className="lvl-bar">
           <i style={{ width: `${result.level.progress * 100}%` }} />

@@ -101,6 +101,10 @@ export function useMeta(): Meta {
   return useSyncExternalStore(subscribe, getMeta, () => SERVER_META);
 }
 
+export function getConfig(): ServerConfig | null {
+  return config;
+}
+
 export function useConfig(): ServerConfig | null {
   return useSyncExternalStore(
     subscribe,

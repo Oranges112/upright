@@ -121,3 +121,32 @@ export async function localNotify(title: string, body: string) {
   }
   return true;
 }
+
+/** What the server knows about this device's reminders (for the health check). */
+export async function pushStatus(): Promise<{ subscribed: boolean; known: boolean; devices: number; lastReminderAt: number | null } | null> {
+  try {
+    const reg = await navigator.serviceWorker.getRegistration();
+    const sub = await reg?.pushManager?.getSubscription();
+    const res = await fetch("/api/push/status", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ code: getMeta().code, endpoint: sub?.endpoint ?? "" }),
+    });
+    if (!res.ok) return null;
+    const j = await res.json();
+    return { subscribed: !!sub, ...j };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Self-repair, run each time the app opens: if reminders were switched on here but the phone
+ * dropped the subscription (or the server forgot it), quietly sign this device up again.
+ */
+export async function healPush(vapidPublicKey: string) {
+  try {
+    if (!getMeta().pushOn || !notificationsSupported() || Notification.permission !== "granted" || !getMeta().code) return;
+    await enablePush(vapidPublicKey);
+  } catch {}
+}

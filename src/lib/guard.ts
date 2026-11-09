@@ -12,6 +12,7 @@
 
 import { addGuardTime, getMeta, setMeta, type GuardBase } from "./store";
 import { sound } from "./sound";
+import { detectFace, getFaceDetector, measureFace, median, type Sample } from "./face";
 import { asset } from "./base";
 
 export type GuardStatus =
@@ -30,15 +31,6 @@ export type GuardStatus =
 
 export const BAD: GuardStatus[] = ["forward", "low", "down", "tilt"];
 
-/** One frame of measurements. All relative, so they work at any camera resolution. */
-interface Sample {
-  w: number; // face width / frame width (bigger = closer to the screen)
-  cy: number; // eye-line height / frame height (bigger = lower)
-  cx: number;
-  pitch: number | null; // (nose y - ear y) / eye distance (bigger = chin down)
-  roll: number | null; // eye-line angle in degrees
-  yaw: number | null; // nose offset from eye midpoint / eye distance
-}
 
 export interface GuardState {
   status: GuardStatus;
@@ -66,10 +58,6 @@ export interface GuardState {
   nudgedAt: number;
 }
 
-const VISION_VERSION = "1.2.2";
-const WASM = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${VISION_VERSION}/wasm`;
-const MODEL = "https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/latest/blaze_face_short_range.tflite";
-
 /**
  * Thresholds per sensitivity, as change from your calibrated posture.
  * size: face grows by this fraction  ·  drop: eyes sink by this fraction of the frame
@@ -86,11 +74,6 @@ const YAW_AWAY = 0.32;
 const RELEASE = 0.75;
 const WINDOW = 6; // samples in the rolling median (~3 s)
 
-const median = (xs: number[]) => {
-  const a = [...xs].sort((p, q) => p - q);
-  const m = a.length >> 1;
-  return a.length % 2 ? a[m] : (a[m - 1] + a[m]) / 2;
-};
 
 /** What each problem means and how to fix it (widget, Guard screen and notifications). */
 export const ISSUE: Partial<Record<GuardStatus, { what: string; fix: string; notify: string }>> = {
@@ -199,7 +182,7 @@ class Guard {
       await v.play().catch(() => {});
       this.video = v;
 
-      if (!this.detector) this.detector = await this.loadDetector();
+      if (!this.detector) this.detector = await getFaceDetector();
 
       this.set({ stream, status: getMeta().guardBase ? "away" : "uncalibrated" });
       this.lastTick = performance.now();
@@ -217,24 +200,6 @@ class Guard {
               ? "Your camera is busy in another app (a video call, or Upright open in your browser). Close that, then try again."
             : "Couldn't start the camera or face tracker.";
       this.set({ status: "error", error: msg });
-    }
-  }
-
-  private async loadDetector() {
-    const { FaceDetector, FilesetResolver } = await import("@mediapipe/tasks-vision");
-    const files = await FilesetResolver.forVisionTasks(WASM);
-    try {
-      return await FaceDetector.createFromOptions(files, {
-        baseOptions: { modelAssetPath: MODEL, delegate: "GPU" },
-        runningMode: "VIDEO",
-        minDetectionConfidence: 0.5,
-      });
-    } catch {
-      return await FaceDetector.createFromOptions(files, {
-        baseOptions: { modelAssetPath: MODEL, delegate: "CPU" },
-        runningMode: "VIDEO",
-        minDetectionConfidence: 0.5,
-      });
     }
   }
 
@@ -295,19 +260,14 @@ class Guard {
     const v = this.video;
     if (!v || !this.detector || v.readyState < 2 || !v.videoWidth) return;
 
-    let res: any;
-    try {
-      res = this.detector.detectForVideo(v, now);
-    } catch {
-      return;
-    }
-    const det = res?.detections?.[0];
+    const det = detectFace(this.detector, v);
     if (!det?.boundingBox) {
       // nobody in front of the camera: pause the clock
       if (!this.calibrating) this.set({ status: getMeta().guardBase ? "away" : "uncalibrated", badFor: 0, drift: 0 });
       return;
     }
-    const smp = this.measure(det, v.videoWidth, v.videoHeight);
+    const smp = measureFace(det, v.videoWidth, v.videoHeight);
+    if (!smp) return;
     this.recent.push(smp);
     if (this.recent.length > WINDOW) this.recent.shift();
     const pick = (k: keyof Sample) => {
@@ -408,38 +368,6 @@ class Guard {
   testNudge() {
     sound.unlock();
     void this.nudge("forward");
-  }
-
-  private measure(det: any, W: number, H: number): Sample {
-    const bb = det.boundingBox;
-    const out: Sample = {
-      w: bb.width / W,
-      cy: (bb.originY + bb.height / 2) / H,
-      cx: (bb.originX + bb.width / 2) / W,
-      pitch: null,
-      roll: null,
-      yaw: null,
-    };
-    const kp: { x: number; y: number }[] | undefined = det.keypoints;
-    if (!kp || kp.length < 6) return out;
-    // keypoints (normalised 0..1): 0 right eye, 1 left eye, 2 nose tip, 3 mouth, 4 right ear, 5 left ear
-    const P = kp.map((p) => ({ x: p.x * W, y: p.y * H }));
-    const [re, le, nose, , rEar, lEar] = P;
-    const ed = Math.hypot(le.x - re.x, le.y - re.y);
-    if (ed < 4) return out;
-    const eyeMid = { x: (re.x + le.x) / 2, y: (re.y + le.y) / 2 };
-    const earY = (rEar.y + lEar.y) / 2;
-    let roll = (Math.atan2(le.y - re.y, le.x - re.x) * 180) / Math.PI;
-    if (roll > 90) roll -= 180;
-    if (roll < -90) roll += 180;
-    return {
-      ...out,
-      cy: eyeMid.y / H,
-      cx: eyeMid.x / W,
-      pitch: (nose.y - earY) / ed,
-      roll,
-      yaw: (nose.x - eyeMid.x) / ed,
-    };
   }
 
   private async nudge(status: GuardStatus) {
