@@ -23,12 +23,16 @@
       "icon": "icon.png"
     },
     "portable": {
-      "artifactName": "Upright-Portable-${version}.exe"
+      "artifactName": "Upright-Portable.exe"
     },
     "nsis": {
-      "artifactName": "Upright-Setup-${version}.exe",
+      "artifactName": "Upright-Setup.exe",
       "oneClick": true,
-      "perMachine": false
+      "perMachine": false,
+      "runAfterFinish": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Upright"
     },
     "directories": {
       "output": "dist"

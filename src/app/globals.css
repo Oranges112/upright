@@ -2445,3 +2445,35 @@ button.link {
 .desk.flip .mini-text {
   align-items: flex-end;
 }
+
+/* ---------------- desktop widget download card ---------------- */
+.desktop-dl {
+  border-color: color-mix(in srgb, var(--good) 35%, var(--border));
+}
+.desktop-dl-head {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+.desktop-dl-dot {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  margin-top: 2px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 38%, #34d399 0 28%, transparent 29%), color-mix(in srgb, #10b981 22%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, #10b981 35%, transparent);
+  animation: dl-breathe 2.4s ease-in-out infinite;
+}
+@keyframes dl-breathe {
+  50% {
+    box-shadow: 0 0 0 6px color-mix(in srgb, #10b981 18%, transparent);
+  }
+}
+.desktop-dl a.btn {
+  text-decoration: none;
+}
+.desktop-dl-steps {
+  margin: 0 0 10px;
+}

@@ -1,5 +1,6 @@
 "use client";
 
+import DesktopDownload from "./DesktopDownload";
 import { useEffect, useState } from "react";
 import { Card, Chips, Toggle, hourLabel } from "./ui";
 import { LEVEL_INFO, ROUTINES, buildTimeline, getRoutine, type Level } from "@/lib/exercises";
@@ -349,6 +350,8 @@ export default function SettingsView({ doc, meta, config, installPrompt }: { doc
           </p>
         )}
       </Card>
+
+      <DesktopDownload />
 
       <Card>
         <h3 className="card-title">🗂 Data</h3>

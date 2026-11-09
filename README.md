@@ -43,7 +43,7 @@ Nothing to install or sign up for. Open the link on your phone or computer, and 
 
 A tiny see-through dot that sits on top of every app. It's faded green while your posture is good, and pops out red with what's wrong ("Head forward · Slide your chin back") when you slouch. Drag it anywhere; right-click it (or the tray icon) to recalibrate, set up a second screen, pause, or open the full app.
 
-Download **Upright-Portable.exe** from [Releases](https://github.com/Oranges112/upright/releases) and double-click it. No install needed. Windows may warn that the app isn't from a known publisher, because it isn't code-signed: click **More info → Run anyway**.
+**[⬇️ Download the Windows installer](https://github.com/Oranges112/upright/releases/latest/download/Upright-Setup.exe)** and open it: it installs in a few seconds and starts the widget. (Prefer no install? Get `Upright-Portable.exe` from [Releases](https://github.com/Oranges112/upright/releases).) You can also download it from the **Guard** tab inside the app. Windows may warn that the app isn't from a known publisher, because it isn't code-signed: click **More info → Run anyway**.
 
 To build it yourself: `cd desktop && npm install && npm run dist`. To point it at your own copy of Upright (for sync), edit `url` in `%APPDATA%\Upright\config.json`.
 

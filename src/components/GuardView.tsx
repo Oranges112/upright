@@ -1,5 +1,6 @@
 "use client";
 
+import DesktopDownload from "./DesktopDownload";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Card, Chips } from "./ui";
 import { BAD, ISSUE, guard, type GuardState, type GuardStatus } from "@/lib/guard";
@@ -198,6 +199,8 @@ export default function GuardView({ today }: { today: string }) {
           )}
         </Card>
       )}
+
+      <DesktopDownload />
 
       <div className="stat-grid three">
         <div className="stat">
