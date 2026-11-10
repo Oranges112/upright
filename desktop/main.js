@@ -7,6 +7,9 @@ const { app, BrowserWindow, Menu, Tray, ipcMain, screen, session, shell, nativeI
 const path = require("path");
 const fs = require("fs");
 
+// Development: UPRIGHT_PROFILE=some-folder runs a separate copy (own settings, own single-instance lock).
+if (process.env.UPRIGHT_PROFILE) app.setPath("userData", path.resolve(process.env.UPRIGHT_PROFILE));
+
 // Chimes must play without a click first.
 app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
 
@@ -110,19 +113,58 @@ function createWidget() {
   widget.on("closed", () => (widget = null));
 }
 
-function openFullApp() {
-  if (appWin) return appWin.focus();
+/** The full app (exercises, gym, progress) in its own window. `query` can start a routine, e.g. "?start=quickie". */
+function openFullApp(query = "") {
+  if (appWin) {
+    if (query) appWin.loadURL(appUrl() + query);
+    if (appWin.isMinimized()) appWin.restore();
+    appWin.show();
+    return appWin.focus();
+  }
   appWin = new BrowserWindow({
     width: 440,
     height: 860,
     title: "Upright",
     icon: path.join(__dirname, "icon.png"),
     autoHideMenuBar: true,
-    webPreferences: { backgroundThrottling: false },
+    webPreferences: { preload: path.join(__dirname, "appPreload.js"), backgroundThrottling: false },
   });
-  appWin.loadURL(appUrl());
-  appWin.on("closed", () => (appWin = null));
+  appWin.loadURL(appUrl() + query);
+  appWin.webContents.setWindowOpenHandler(({ url }) => {
+    void shell.openExternal(url);
+    return { action: "deny" };
+  });
+  appWin.on("closed", () => {
+    appWin = null;
+    setExercising(false);
+  });
 }
+
+/* ---------- pause the dot while you exercise in the app window ---------- */
+// (otherwise nods and stretches look like slouching and it nudges you mid-exercise)
+let exercising = false;
+function setExercising(on) {
+  if (exercising === on) return;
+  exercising = on;
+  if (!paused) send(on ? "pause" : "resume");
+  if (on) status = { tone: "idle", label: "Paused while you exercise" };
+  if (tray) tray.setToolTip(`Upright: ${on ? "Paused while you exercise" : status.label}`);
+}
+
+/* ---------- upright:// links (from the website, shortcuts, or a second launch) ---------- */
+const PROTOCOL = "upright";
+function handleLink(url) {
+  if (!url || !url.startsWith(`${PROTOCOL}://`)) return false;
+  const parts = url.slice(PROTOCOL.length + 3).replace(/\/+$/, "").split("/").filter(Boolean);
+  const [action, arg] = parts;
+  if (widget && !widget.isVisible()) widget.showInactive();
+  if (action === "start") openFullApp(`?start=${encodeURIComponent(arg || "default")}`);
+  else if (action === "widget") {
+    /* just make sure the dot is showing */
+  } else openFullApp();
+  return true;
+}
+const linkFrom = (argv) => argv.find((a) => typeof a === "string" && a.startsWith(`${PROTOCOL}://`));
 
 function send(cmd) {
   if (widget) widget.webContents.send("cmd", cmd);
@@ -139,11 +181,12 @@ function menu() {
       label: paused ? "Resume Posture Guard" : "Pause Posture Guard",
       click: () => {
         paused = !paused;
-        send(paused ? "pause" : "resume");
+        if (!exercising) send(paused ? "pause" : "resume");
       },
     },
     { type: "separator" },
-    { label: "Open full app (exercises, progress)", click: openFullApp },
+    { label: "Open full app (exercises, gym, progress)", click: () => openFullApp() },
+    { label: "Start a quick neck break", click: () => openFullApp("?start=default") },
     {
       label: widget && widget.isVisible() ? "Hide widget" : "Show widget",
       click: () => (widget && widget.isVisible() ? widget.hide() : widget && widget.showInactive()),
@@ -194,12 +237,21 @@ ipcMain.on("status", (_e, s) => {
   if (tray) tray.setToolTip(`Upright: ${status.label}`);
 });
 ipcMain.on("contextMenu", () => menu().popup({ window: widget }));
+ipcMain.on("exercising", (_e, on) => setExercising(!!on));
 
 /* ---------- start ---------- */
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
-  app.on("second-instance", () => widget && widget.showInactive());
+  // opening Upright again (desktop shortcut, Start menu, or an upright:// link) while it's already running
+  app.on("second-instance", (_e, argv) => {
+    if (!handleLink(linkFrom(argv))) {
+      if (widget) widget.showInactive();
+      openFullApp();
+    }
+  });
+  // register upright:// links (the installer also does this); skip in development so we don't point Windows at a dev build
+  if (app.isPackaged) app.setAsDefaultProtocolClient(PROTOCOL);
   app.whenReady().then(() => {
     cfg = loadCfg();
     if (!cfg.url) {
@@ -215,6 +267,9 @@ if (!app.requestSingleInstanceLock()) {
 
     createWidget();
     createTray();
+    // launched by a link (e.g. "Open Upright" on the website)
+    const first = linkFrom(process.argv);
+    if (first) widget.once("ready-to-show", () => handleLink(first));
     screen.on("display-removed", () => {
       const wa = workAreaFor(anchor);
       anchor = { x: Math.min(anchor.x, wa.x + wa.width - DOT), y: Math.min(anchor.y, wa.y + wa.height - DOT) };

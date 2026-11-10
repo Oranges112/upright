@@ -14,3 +14,23 @@ export interface DesktopBridge {
 export function desktopBridge(): DesktopBridge | undefined {
   return typeof window === "undefined" ? undefined : (window as any).uprightDesktop;
 }
+
+/** Bridge in the desktop app's full-app window (see desktop/appPreload.js). Absent in a normal browser. */
+export interface AppBridge {
+  /** an exercise session started / ended: the desktop posture dot pauses meanwhile */
+  exercising: (on: boolean) => void;
+}
+
+export function appBridge(): AppBridge | undefined {
+  return typeof window === "undefined" ? undefined : (window as any).uprightApp;
+}
+
+/** Tells the desktop app (if we're inside it) that exercises are running while this component is mounted. */
+export function signalExercising() {
+  appBridge()?.exercising(true);
+  return () => appBridge()?.exercising(false);
+}
+
+/** Opens the installed Windows app (registered by its installer). */
+export const OPEN_DESKTOP_APP = "upright://open";
+export const DESKTOP_KEY = "upright:desktop-installed";

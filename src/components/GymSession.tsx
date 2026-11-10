@@ -5,6 +5,7 @@ import { planItem, planSets, type GymPlan } from "@/lib/gym";
 import { logSession } from "@/lib/store";
 import { sound } from "@/lib/sound";
 import { fmtClock } from "@/lib/exercises";
+import { signalExercising } from "@/lib/desktop";
 import GymFigure from "./GymFigure";
 import { GymDetail, prescription } from "./Learn";
 
@@ -41,6 +42,7 @@ export default function GymSession({ plan, onClose }: { plan: GymPlan; onClose: 
   const left = Math.max(0, (endAt - now) / 1000);
 
   useEffect(() => setWeights(loadWeights()), []);
+  useEffect(signalExercising, []);
 
   /* keep the screen on */
   useEffect(() => {

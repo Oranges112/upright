@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { desktopBridge } from "@/lib/desktop";
+import { DESKTOP_KEY, OPEN_DESKTOP_APP, appBridge, desktopBridge } from "@/lib/desktop";
 
 /** Always points at the newest installer published on GitHub. */
 export const WINDOWS_INSTALLER = "https://github.com/Oranges112/upright/releases/latest/download/Upright-Setup.exe";
@@ -11,7 +11,7 @@ function useShow() {
   const [show, setShow] = useState(false);
   useEffect(() => {
     const ua = navigator.userAgent;
-    setShow(/Windows/i.test(ua) && !/Electron/i.test(ua) && !desktopBridge());
+    setShow(/Windows/i.test(ua) && !/Electron/i.test(ua) && !desktopBridge() && !appBridge());
   }, []);
   return show;
 }
@@ -20,15 +20,48 @@ function useShow() {
 export default function DesktopDownload({ compact = false }: { compact?: boolean }) {
   const show = useShow();
   const [clicked, setClicked] = useState(false);
+  const [have, setHave] = useState(false);
+  useEffect(() => {
+    try {
+      setHave(localStorage.getItem(DESKTOP_KEY) === "1");
+    } catch {}
+  }, []);
   if (!show) return null;
 
-  const button = (
-    <a className="btn primary" href={WINDOWS_INSTALLER} onClick={() => setClicked(true)} rel="noopener">
-      ⬇️ Download for Windows
+  const remember = () => {
+    setHave(true);
+    try {
+      localStorage.setItem(DESKTOP_KEY, "1");
+    } catch {}
+  };
+
+  const download = (
+    <a
+      className={`btn ${have ? "ghost" : "primary"}`}
+      href={WINDOWS_INSTALLER}
+      onClick={() => {
+        setClicked(true);
+        remember();
+      }}
+      rel="noopener"
+    >
+      ⬇️ {have ? "Download again" : "Download for Windows"}
     </a>
   );
+  // Windows asks "Open Upright?" the first time; nothing happens if it isn't installed
+  const open = (
+    <a className={`btn ${have ? "primary" : "ghost"}`} href={OPEN_DESKTOP_APP} onClick={remember}>
+      🖥️ {have ? "Open Upright" : "Already installed? Open it"}
+    </a>
+  );
+  const button = (
+    <>
+      {have ? open : download}
+      {have ? download : open}
+    </>
+  );
 
-  if (compact) return button;
+  if (compact) return have ? open : download;
 
   return (
     <div className="card desktop-dl">
@@ -36,7 +69,7 @@ export default function DesktopDownload({ compact = false }: { compact?: boolean
         <span className="desktop-dl-dot" aria-hidden />
         <div>
           <h3 className="card-title" style={{ margin: 0 }}>
-            Get the desktop widget
+            {have ? "Upright for Windows" : "Get the desktop widget"}
           </h3>
           <p className="row-hint" style={{ margin: "4px 0 0" }}>
             A tiny see-through dot that floats over every app: faded green when you&apos;re sitting well, popping out red with what to fix when you
@@ -59,7 +92,8 @@ export default function DesktopDownload({ compact = false }: { compact?: boolean
         <div className="btn-row">{button}</div>
       )}
       <p className="tiny muted" style={{ marginBottom: 0 }}>
-        Free, ~120 MB, Windows 10/11. Everything runs on your computer.{" "}
+        Free, ~120 MB, Windows 10/11. Everything runs on your computer. Opening it also gives you the full app with exercises and gym workouts, and the
+        dot pauses itself while you exercise.{" "}
         {clicked && (
           <a href={WINDOWS_INSTALLER} rel="noopener">
             Download didn&apos;t start? Try again

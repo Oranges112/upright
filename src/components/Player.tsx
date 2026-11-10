@@ -1,5 +1,6 @@
 "use client";
 
+import { signalExercising } from "@/lib/desktop";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Figure from "./Figure";
 import Ring from "./Ring";
@@ -35,6 +36,7 @@ export default function Player({ routine, onClose }: Props) {
   const [tipBump, setTipBump] = useState(0);
 
   const startedAt = useRef(Date.now());
+  useEffect(signalExercising, []);
   const workedMs = useRef(0);
   const stepStart = useRef(performance.now());
   const pausedRef = useRef(false);
