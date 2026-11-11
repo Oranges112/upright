@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import { BAD, ISSUE, guard } from "@/lib/guard";
-import { useDoc, useMeta } from "@/lib/store";
+import { useMeta } from "@/lib/store";
+import { claimRecentSlot, recentLabel, recentSummary, trackRecent } from "@/lib/recent";
 import { useGuard } from "./GuardView";
 import { desktopBridge } from "@/lib/desktop";
 
@@ -28,10 +29,11 @@ function fmtMin(sec: number) {
  *  - "desktop": inside the Upright desktop app: just a small see-through dot while you're fine,
  *    popping out into a solid pill with the reason when something's wrong (or when you hover)
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export default function MiniWidget({ today, mode = "pip" }: { today: string; mode?: "pip" | "desktop" }) {
   const g = useGuard();
-  const doc = useDoc();
   const meta = useMeta();
+  useEffect(trackRecent, []);
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
     const id = setInterval(() => setNow(Date.now()), 500);
@@ -50,15 +52,25 @@ export default function MiniWidget({ today, mode = "pip" }: { today: string; mod
   const tone = bad ? "bad" : g.status === "good" ? "good" : g.status === "uncalibrated" || g.status === "calibrating" ? "warn" : "idle";
   const flash = now - g.nudgedAt < 4000;
 
-  const rows = doc.guard.filter((x) => x.day === today);
-  const good = rows.reduce((a, x) => a + x.goodSec, 0) + g.sessionGood;
-  const total = rows.reduce((a, x) => a + x.totalSec, 0) + g.sessionTotal;
-  const pct = total > 30 ? Math.round((good / total) * 100) : null;
+  // When a slouch starts, sometimes (at most once an hour) show how upright you've been lately.
+  const [stat, setStat] = useState<{ text: string; until: number } | null>(null);
+  // only for a real slouch (2 s+), not a momentary blip, so the hourly slot isn't wasted
+  const settled = bad && g.badFor >= 2;
+  useEffect(() => {
+    if (!settled) return;
+    const r = recentSummary();
+    if (r && claimRecentSlot()) setStat({ text: recentLabel(r), until: Date.now() + 7000 });
+  }, [settled]);
+  const showStat = bad && !!stat && now < stat.until;
 
   const delay = meta.guardDelaySec ?? 30;
   const chimeIn = Math.max(0, Math.ceil(delay - g.badFor));
-  // ring: countdown to the chime while slouching, otherwise today's %
-  const ring = bad ? Math.min(1, g.badFor / delay) : g.status === "calibrating" ? 1 - g.calibrateLeft / 3 : (pct ?? 0) / 100;
+  // ring = how good your posture is right now (the same live score as the Good ↔ Slouch meter in Guard)
+  const live = running && !["uncalibrated", "calibrating", "away", "looking", "starting"].includes(g.status);
+  const ring = g.status === "calibrating" ? 1 - g.calibrateLeft / 3 : live ? Math.max(0.04, 1 - Math.min(1, g.drift / 1.6)) : 0;
+  // green → amber → red as you drift toward the slouch threshold
+  const hue = Math.round(152 * (1 - Math.min(1, g.drift)));
+  const ringColor = live ? `hsl(${hue} 72% ${bad ? 55 : 46}%)` : undefined;
   const C = 2 * Math.PI * 15;
 
   // the little head leans, sinks, drops or tilts with you
@@ -81,14 +93,14 @@ export default function MiniWidget({ today, mode = "pip" }: { today: string; mod
       : "Tap to start"
     : flash && issue
       ? `${issue.fix} 🙆`
-      : issue
+      : showStat
+        ? stat!.text
+        : issue
         ? issue.fix
         : g.status === "good"
           ? goodFor >= 60
             ? `Holding for ${fmtMin(goodFor)}`
-            : pct != null
-              ? `${pct}% good today`
-              : "Keep it up"
+            : "Keep it up"
           : g.status === "uncalibrated"
             ? "then tap here to calibrate"
             : g.status === "calibrating"
@@ -159,7 +171,16 @@ export default function MiniWidget({ today, mode = "pip" }: { today: string; mod
   const ringSvg = (
     <svg className="mini-ring" viewBox="0 0 36 36" aria-hidden>
       <circle cx="18" cy="18" r="15" className="track" />
-      <circle cx="18" cy="18" r="15" className="arc" strokeDasharray={C} strokeDashoffset={C * (1 - ring)} transform="rotate(-90 18 18)" />
+      <circle
+        cx="18"
+        cy="18"
+        r="15"
+        className="arc"
+        strokeDasharray={C}
+        strokeDashoffset={C * (1 - ring)}
+        transform="rotate(-90 18 18)"
+        style={ringColor ? { stroke: ringColor } : undefined}
+      />
       <g className="mini-body">
         <path d="M12 28 Q18 24.5 24 28" className="shoulders" />
         <g style={{ transform: `translate(${head.x}px, ${head.y}px) rotate(${head.r}deg)`, transformOrigin: "18px 24px", transition: "transform .5s ease" }}>
@@ -199,7 +220,7 @@ export default function MiniWidget({ today, mode = "pip" }: { today: string; mod
           <>
             <div className="mini-text">
               <b>{title}</b>
-              <span>{sub}</span>
+              <span className={showStat ? "mini-stat" : undefined}>{sub}</span>
             </div>
             {bad && chimeIn > 0 && <span className="mini-count">{chimeIn}s</span>}
             {!bad && running && g.status !== "uncalibrated" && g.status !== "calibrating" && (

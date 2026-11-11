@@ -3069,3 +3069,9 @@ button.link {
   font-size: 2rem;
   margin: 0;
 }
+
+/* "84% upright in the last 3 hrs": shown briefly when a slouch starts, at most once an hour */
+.mini-text .mini-stat {
+  font-weight: 700;
+  animation: fadein 0.4s ease;
+}
