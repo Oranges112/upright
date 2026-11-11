@@ -113,6 +113,23 @@ function createWidget() {
   widget.on("closed", () => (widget = null));
 }
 
+/**
+ * Where the full-app window opens: where you last left it, or a roomy desktop-sized window
+ * (the app lays itself out for whatever size you give it).
+ */
+function appWindowBounds() {
+  const saved = cfg.appBounds;
+  if (saved && saved.width >= 360 && saved.height >= 560) {
+    const wa = workAreaFor({ x: saved.x + 40, y: saved.y + 40 });
+    const visible = saved.x + 80 > wa.x && saved.x < wa.x + wa.width - 80 && saved.y >= wa.y - 10 && saved.y < wa.y + wa.height - 80;
+    if (visible) return saved;
+  }
+  const wa = screen.getPrimaryDisplay().workArea;
+  const width = Math.min(1280, Math.round(wa.width * 0.85));
+  const height = Math.min(860, Math.round(wa.height * 0.9));
+  return { width, height, x: Math.round(wa.x + (wa.width - width) / 2), y: Math.round(wa.y + (wa.height - height) / 2) };
+}
+
 /** The full app (exercises, gym, progress) in its own window. `query` can start a routine, e.g. "?start=quickie". */
 function openFullApp(query = "") {
   if (appWin) {
@@ -122,8 +139,9 @@ function openFullApp(query = "") {
     return appWin.focus();
   }
   appWin = new BrowserWindow({
-    width: 440,
-    height: 860,
+    ...appWindowBounds(),
+    minWidth: 360,
+    minHeight: 560,
     title: "Upright",
     icon: path.join(__dirname, "icon.png"),
     autoHideMenuBar: true,
@@ -134,6 +152,18 @@ function openFullApp(query = "") {
     void shell.openExternal(url);
     return { action: "deny" };
   });
+  if (cfg.appMaximized) appWin.maximize();
+  // remember the size and place you leave it at
+  const remember = () => {
+    if (!appWin || appWin.isMinimized()) return;
+    cfg.appMaximized = appWin.isMaximized();
+    if (!cfg.appMaximized && !appWin.isFullScreen()) cfg.appBounds = appWin.getBounds();
+    saveCfg();
+  };
+  appWin.on("resized", remember);
+  appWin.on("moved", remember);
+  appWin.on("maximize", remember);
+  appWin.on("unmaximize", remember);
   appWin.on("closed", () => {
     appWin = null;
     setExercising(false);
@@ -175,7 +205,6 @@ function menu() {
     { label: `Upright: ${status.label}`, enabled: false },
     { type: "separator" },
     { label: "Recalibrate (sit tall first)", click: () => send("calibrate") },
-    { label: "Calibrate my second screen", click: () => send("calibrate2") },
     { label: "Test a nudge", click: () => send("test") },
     {
       label: paused ? "Resume Posture Guard" : "Pause Posture Guard",

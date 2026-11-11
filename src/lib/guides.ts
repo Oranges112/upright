@@ -99,7 +99,7 @@ export const GUIDES: Guide[] = [
         list: [
           "If you use both equally, put the join between them right in front of you.",
           "If one is your main screen, put it straight in front and the second one to the side, angled toward you.",
-          "Run Guard's second-screen calibration so turning to it doesn't count as slouching.",
+          "Posture Guard keeps watching while you look at the second screen, so sit tall there too.",
         ],
       },
       {

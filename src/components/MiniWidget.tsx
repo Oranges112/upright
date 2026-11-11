@@ -14,6 +14,7 @@ const TITLE: Record<string, string> = {
   calibrating: "Hold still…",
   good: "Great posture",
   looking: "Looking away",
+  moved: "Camera moved",
   away: "Paused",
   error: "Camera issue",
 };
@@ -49,7 +50,7 @@ export default function MiniWidget({ today, mode = "pip" }: { today: string; mod
   const running = g.status !== "off" && g.status !== "error";
   const bad = BAD.includes(g.status);
   const issue = bad ? ISSUE[g.status] : undefined;
-  const tone = bad ? "bad" : g.status === "good" ? "good" : g.status === "uncalibrated" || g.status === "calibrating" ? "warn" : "idle";
+  const tone = bad ? "bad" : g.status === "good" ? "good" : g.status === "uncalibrated" || g.status === "calibrating" || g.status === "moved" ? "warn" : "idle";
   const flash = now - g.nudgedAt < 4000;
 
   // When a slouch starts, sometimes (at most once an hour) show how upright you've been lately.
@@ -66,7 +67,7 @@ export default function MiniWidget({ today, mode = "pip" }: { today: string; mod
   const delay = meta.guardDelaySec ?? 30;
   const chimeIn = Math.max(0, Math.ceil(delay - g.badFor));
   // ring = how good your posture is right now (the same live score as the Good ↔ Slouch meter in Guard)
-  const live = running && !["uncalibrated", "calibrating", "away", "looking", "starting"].includes(g.status);
+  const live = running && !["uncalibrated", "calibrating", "away", "looking", "moved", "starting"].includes(g.status);
   const ring = g.status === "calibrating" ? 1 - g.calibrateLeft / 3 : live ? Math.max(0.04, 1 - Math.min(1, g.drift / 1.6)) : 0;
   // green → amber → red as you drift toward the slouch threshold
   const hue = Math.round(152 * (1 - Math.min(1, g.drift)));
@@ -82,11 +83,7 @@ export default function MiniWidget({ today, mode = "pip" }: { today: string; mod
     tilt: { x: 0, y: 0, r: -22 * k },
   }[g.status as "forward"] ?? { x: 0, y: 0, r: 0 };
 
-  const title = issue
-    ? issue.what
-    : g.status === "calibrating" && g.calibratingScreen === 2
-      ? "Screen 2: hold still"
-      : TITLE[g.status] ?? "";
+  const title = issue ? issue.what : TITLE[g.status] ?? "";
   const sub = !running
     ? g.status === "error" && g.error?.includes("busy")
       ? "Camera busy in another app · tap to retry"
@@ -103,6 +100,8 @@ export default function MiniWidget({ today, mode = "pip" }: { today: string; mod
             : "Keep it up"
           : g.status === "uncalibrated"
             ? "then tap here to calibrate"
+            : g.status === "moved"
+            ? "Sit tall, tap to recalibrate"
             : g.status === "calibrating"
               ? `${Math.ceil(g.calibrateLeft)}…`
               : g.status === "looking"
@@ -115,7 +114,7 @@ export default function MiniWidget({ today, mode = "pip" }: { today: string; mod
   const desktop = mode === "desktop";
   const [hover, setHover] = useState(false);
   const leaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const needsAttention = bad || flash || !running || g.status === "uncalibrated" || g.status === "calibrating" || g.status === "starting";
+  const needsAttention = bad || flash || !running || g.status === "uncalibrated" || g.status === "moved" || g.status === "calibrating" || g.status === "starting";
   const expanded = !desktop || needsAttention || hover;
   const [flip, setFlip] = useState(false);
 
@@ -165,7 +164,7 @@ export default function MiniWidget({ today, mode = "pip" }: { today: string; mod
   const onMain = () => {
     if (justDragged.current) return;
     if (!running) void guard.start();
-    else if (g.status === "uncalibrated") guard.calibrate();
+    else if (g.status === "uncalibrated" || g.status === "moved") guard.calibrate();
   };
 
   const ringSvg = (
@@ -223,7 +222,7 @@ export default function MiniWidget({ today, mode = "pip" }: { today: string; mod
               <span className={showStat ? "mini-stat" : undefined}>{sub}</span>
             </div>
             {bad && chimeIn > 0 && <span className="mini-count">{chimeIn}s</span>}
-            {!bad && running && g.status !== "uncalibrated" && g.status !== "calibrating" && (
+            {!bad && running && g.status !== "uncalibrated" && g.status !== "moved" && g.status !== "calibrating" && (
               <button
                 className="mini-icon"
                 title="Recalibrate (sit tall first)"

@@ -67,13 +67,13 @@ export default function Progress({ doc, today }: { doc: Doc; today: string }) {
         <Heatmap doc={doc} today={today} />
       </Card>
 
-      <Card>
+      <Card className="half">
         <h3 className="card-title">Practice vs. how your neck feels</h3>
         <WeeklyChart weeks={weeks} />
         <Insight doc={doc} weeks={weeks} />
       </Card>
 
-      <Card>
+      <Card className="half">
         <h3 className="card-title">Posture tests</h3>
         <p className="muted small">
           Real-world checks that show whether the practice is working. Retest every 2–4 weeks.

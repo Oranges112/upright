@@ -9,7 +9,7 @@ import { STATIC } from "./base";
 const KEY = "upright:v1";
 const META_KEY = "upright:meta";
 
-/** Your "sitting tall" measurements for one screen. */
+/** Your "sitting tall" measurements, for this device's camera in its current position. */
 export interface GuardBase {
   w: number;
   cy: number;
@@ -18,6 +18,10 @@ export interface GuardBase {
   roll?: number;
   yaw?: number;
   cx?: number;
+  /** turn-proof measures (see Sample in face.ts); missing on older calibrations */
+  em?: number;
+  pitchM?: number;
+  edm?: number;
 }
 
 export interface Meta {
@@ -31,8 +35,6 @@ export interface Meta {
   deviceId?: string;
   /** Posture Guard calibration for this device's camera */
   guardBase?: GuardBase;
-  /** optional calibration while looking at a second monitor */
-  guardBase2?: GuardBase;
   guardSensitivity?: 1 | 2 | 3;
   guardDelaySec?: number;
 }

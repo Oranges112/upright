@@ -5,7 +5,7 @@ export interface DesktopBridge {
   getPos: () => Promise<{ x: number; y: number }>;
   moveTo: (x: number, y: number) => void;
   dragEnd: () => void;
-  /** menu clicks from the tray / right-click menu: calibrate, calibrate2, pause, resume, test */
+  /** menu clicks from the tray / right-click menu: calibrate, pause, resume, test (older versions also send calibrate2) */
   onCommand: (cb: (cmd: string) => void) => void;
   setStatus: (status: { tone: string; label: string }) => void;
   contextMenu: () => void;

@@ -4,15 +4,22 @@
  * Posture Guard: on-device slouch detection with the webcam.
  *
  * How it works: we track your face with MediaPipe's tiny face detector (runs locally,
- * nothing is uploaded). After you calibrate while sitting tall, two signals reveal tech neck:
+ * nothing is uploaded). After you calibrate while sitting tall, these signals reveal tech neck:
  *  - your face gets BIGGER in the frame  -> head is pushed forward toward the screen
  *  - your face DROPS in the frame        -> you're sinking / slumping
- * If either holds for a while, you get a gentle nudge.
+ *  - nose drops relative to ears          -> chin dropping
+ *  - eye line tilts                       -> head tilted
+ * If one holds for a while, you get a gentle nudge.
+ *
+ * Everything is measured against YOUR calibration, so a raised or tilted laptop is fine as
+ * long as it stays put. If the camera moves (lid tilted, laptop raised or moved), we notice
+ * and ask for a recalibration. Turning to look at another screen keeps being judged, using
+ * measurements that don't change when you turn your head.
  */
 
 import { addGuardTime, getMeta, setMeta, type GuardBase } from "./store";
 import { sound } from "./sound";
-import { detectFace, getFaceDetector, measureFace, median, type Sample } from "./face";
+import { detectFace, getFaceDetector, measureFace, median, openCamera, type Sample } from "./face";
 import { asset } from "./base";
 
 export type GuardStatus =
@@ -25,7 +32,8 @@ export type GuardStatus =
   | "low" // sinking into the chair
   | "down" // chin dropped / looking down
   | "tilt" // head tilted to one side
-  | "looking" // turned away (second screen, talking): not counted
+  | "looking" // turned far away (talking to someone behind you): not counted
+  | "moved" // the camera moved since calibrating: not counted until you recalibrate
   | "away"
   | "error";
 
@@ -46,14 +54,14 @@ export interface GuardState {
   sessionTotal: number;
   sessionNudges: number;
   calibrateLeft: number;
-  /** true when the saved calibration predates the newer checks (chin-down, tilt) */
+  /** true when the saved calibration predates the newer checks (turn-proof measures) */
   oldCalibration: boolean;
-  /** face is much further away than when calibrated: setup probably moved */
+  /** the camera seems to have moved since calibrating (laptop moved, raised, or lid tilted) */
   moved: boolean;
-  /** which screen you're looking at (2 = second monitor, if calibrated) */
-  screen: 1 | 2;
-  /** which screen the current calibration is for */
-  calibratingScreen: 1 | 2;
+  /** you're turned toward another screen, and still being checked */
+  turned: boolean;
+  /** a big slouch that hasn't budged for minutes: maybe the laptop was raised or tilted, not you */
+  maybeMoved: boolean;
   /** when the last nudge fired (widget flashes) */
   nudgedAt: number;
 }
@@ -63,16 +71,90 @@ export interface GuardState {
  * size: face grows by this fraction  ·  drop: eyes sink by this fraction of the frame
  * pitch: nose drops relative to ears by this x eye distance  ·  roll: degrees of side tilt
  */
-const THRESH: Record<1 | 2 | 3, { size: number; drop: number; pitch: number; roll: number }> = {
+export const THRESH: Record<1 | 2 | 3, { size: number; drop: number; pitch: number; roll: number }> = {
   1: { size: 0.2, drop: 0.12, pitch: 0.3, roll: 16 }, // relaxed
   2: { size: 0.13, drop: 0.08, pitch: 0.2, roll: 11 }, // normal
   3: { size: 0.08, drop: 0.05, pitch: 0.13, roll: 8 }, // strict
 };
-/** turned this far (nose vs eyes) = looking at another screen / person: don't judge */
-const YAW_AWAY = 0.32;
+/**
+ * Head turn, as nose offset / eye distance (about 0.55 x tan(angle)):
+ *  - under TURN_SMALL (~15°) you're facing the screen: every measure is reliable
+ *  - up to TURN_AWAY (~55°) you're looking at another screen: judged with turn-proof measures
+ *  - beyond that you've turned right away (talking to someone): not judged
+ */
+const TURN_SMALL = 0.15;
+const TURN_OLD = 0.32; // old calibrations (no turn-proof measures) stop judging here, as before
+const TURN_AWAY = 0.8;
+/** thresholds are this much looser while turned: the side-on face is harder to measure */
+const TURNED_SLACK = 1.25;
 /** once flagged, you must get back under this fraction of the threshold to be "good" (no flicker) */
 const RELEASE = 0.75;
 const WINDOW = 6; // samples in the rolling median (~3 s)
+/** setup changed: you'd never be this much further away / higher in the frame from slouching */
+const MOVED_FAR = 0.72;
+const MOVED_UP = 2.5; // x the "sinking" threshold, upward
+const MOVED_SEC = 20;
+const STUCK_SCORE = 2;
+const STUCK_SEC = 120;
+
+export type Thresholds = (typeof THRESH)[1 | 2 | 3];
+export type Measures = Pick<Sample, "w" | "cy" | "pitch" | "roll" | "yaw" | "em" | "pitchM" | "edm">;
+
+export interface Assessment {
+  scores: [GuardStatus, number][];
+  /** turned toward another screen (still judged) */
+  turned: boolean;
+  /** turned right away: don't judge */
+  away: boolean;
+  /** how big your face is vs calibration (1 = same distance), turn-proof when possible */
+  size: number | null;
+  /** setup seems to have moved this tick */
+  movedNow: boolean;
+}
+
+/**
+ * Score your posture against your calibration. Pure, so it's easy to test.
+ * Each score is 0 when you're as you calibrated and 1 right at the threshold.
+ */
+export function assess(m: Measures, base: GuardBase, t: Thresholds): Assessment {
+  const turn = m.yaw != null && base.yaw != null ? Math.abs(m.yaw - base.yaw) : 0;
+  const proof = base.em != null && m.em != null; // turn-proof measures available
+  const away = turn > (proof ? TURN_AWAY : TURN_OLD);
+  const turned = !away && turn >= TURN_SMALL;
+  const k = turned ? TURNED_SLACK : 1;
+
+  // distance to the camera: face width shrinks as you turn, eye-to-mouth doesn't
+  const rW = m.w / base.w;
+  const rEm = proof ? m.em! / base.em! : null;
+  const size = rEm == null ? (turned ? null : rW) : turned ? rEm : (rW + rEm) / 2;
+
+  // chin down: ear-to-nose height over eye-to-mouth survives turning; the old measure doesn't
+  let down = 0;
+  if (base.pitchM != null && m.pitchM != null) down = (m.pitchM - base.pitchM) / t.pitch;
+  else if (!turned && base.pitch != null && m.pitch != null) down = (m.pitch - base.pitch) / t.pitch;
+
+  // tilt: turning squashes the eye line sideways, which exaggerates the angle; undo that
+  let tilt = 0;
+  if (m.roll != null && base.roll != null) {
+    let roll = m.roll;
+    if (turned && m.edm != null && base.edm != null && base.edm > 0) {
+      const squash = Math.min(1, m.edm / base.edm);
+      roll = (Math.atan(Math.tan((roll * Math.PI) / 180) * squash) * 180) / Math.PI;
+    }
+    tilt = Math.abs(roll - base.roll) / t.roll;
+  }
+
+  const scores: [GuardStatus, number][] = [
+    ["forward", size == null ? 0 : (size - 1) / (t.size * k)],
+    ["low", (m.cy - base.cy) / (t.drop * k)],
+    ["down", down / k],
+    ["tilt", tilt / k],
+  ];
+  scores.sort((p, q) => q[1] - p[1]);
+
+  const movedNow = (size != null && size < MOVED_FAR) || base.cy - m.cy > MOVED_UP * t.drop;
+  return { scores, turned, away, size, movedNow };
+}
 
 
 /** What each problem means and how to fix it (widget, Guard screen and notifications). */
@@ -139,12 +221,13 @@ class Guard {
   private samples: Sample[] = [];
   private recent: Sample[] = [];
   private movedFor = 0;
+  private stuckFor = 0;
   private calibrating = false;
   private pending = { good: 0, total: 0, nudges: 0 };
   private lastFlush = 0;
 
   private fresh(): GuardState {
-    return { status: "off", stream: null, w: 0, cy: 0, drift: 0, badFor: 0, sessionGood: 0, sessionTotal: 0, sessionNudges: 0, calibrateLeft: 0, nudgedAt: 0, oldCalibration: false, moved: false, screen: 1, calibratingScreen: 1 };
+    return { status: "off", stream: null, w: 0, cy: 0, drift: 0, badFor: 0, sessionGood: 0, sessionTotal: 0, sessionNudges: 0, calibrateLeft: 0, nudgedAt: 0, oldCalibration: false, moved: false, turned: false, maybeMoved: false };
   }
 
   subscribe = (l: () => void) => {
@@ -167,10 +250,7 @@ class Guard {
     if (this.running) return;
     this.set({ ...this.fresh(), status: "starting" });
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" },
-        audio: false,
-      });
+      const stream = await openCamera();
       // Keep a hidden <video> in the page so detection continues on every screen.
       const v = document.createElement("video");
       v.muted = true;
@@ -217,15 +297,14 @@ class Guard {
     this.set({ ...this.fresh(), status: "off" });
   }
 
-  /**
-   * Sit tall, then call this: averages 3 seconds of measurements as your "good" posture.
-   * screen 2 = while looking at your second monitor, so working there isn't "looking away".
-   */
-  calibrate(screen: 1 | 2 = 1) {
+  /** Sit tall, facing your main screen, then call this: 3 seconds of measurements become your "good" posture. */
+  calibrate() {
     if (!this.running) return;
     this.samples = [];
     this.calibrating = true;
-    this.set({ status: "calibrating", calibrateLeft: 3, calibratingScreen: screen });
+    this.movedFor = 0;
+    this.stuckFor = 0;
+    this.set({ status: "calibrating", calibrateLeft: 3, moved: false, maybeMoved: false });
     sound.next();
   }
 
@@ -239,8 +318,19 @@ class Guard {
       const xs = this.samples.map((x) => x[k]).filter((x): x is number => x != null);
       return xs.length ? median(xs) : undefined;
     };
-    const b: GuardBase = { w: med("w")!, cy: med("cy")!, cx: med("cx"), pitch: med("pitch"), roll: med("roll"), yaw: med("yaw"), at: Date.now() };
-    setMeta(this.state.calibratingScreen === 2 ? { guardBase2: b } : { guardBase: b });
+    const b: GuardBase = {
+      w: med("w")!,
+      cy: med("cy")!,
+      cx: med("cx"),
+      pitch: med("pitch"),
+      roll: med("roll"),
+      yaw: med("yaw"),
+      em: med("em"),
+      pitchM: med("pitchM"),
+      edm: med("edm"),
+      at: Date.now(),
+    };
+    setMeta({ guardBase: b });
     this.recent = [];
     this.set({ status: "good", calibrateLeft: 0, badFor: 0, oldCalibration: false, moved: false });
     sound.complete();
@@ -286,45 +376,38 @@ class Guard {
     }
 
     const meta = getMeta();
-    const base1 = meta.guardBase;
-    if (!base1) {
+    const base = meta.guardBase;
+    if (!base) {
       this.set({ w: sw, cy: scy, status: "uncalibrated" });
       return;
     }
 
     const t = THRESH[(meta.guardSensitivity ?? 2) as 1 | 2 | 3];
-    const yaw = pick("yaw");
-    // Second monitor: judge you against whichever screen's calibration your head is turned toward.
-    const base2 = meta.guardBase2;
-    const near = (b?: GuardBase) => (b && yaw != null && b.yaw != null ? Math.abs(yaw - b.yaw) : Infinity);
-    const screen: 1 | 2 = base2 && near(base2) < near(base1) ? 2 : 1;
-    const base = screen === 2 ? base2! : base1;
-    const pitch = pick("pitch");
-    const roll = pick("roll");
+    const a = assess(
+      { w: sw, cy: scy, pitch: pick("pitch"), roll: pick("roll"), yaw: pick("yaw"), em: pick("em"), pitchM: pick("pitchM"), edm: pick("edm") },
+      base,
+      t,
+    );
+    const [worst, score] = a.scores[0];
 
-    // Each check scores from 0 up: 1 = right at the threshold.
-    const scores: [GuardStatus, number][] = [
-      ["forward", (sw / base.w - 1) / t.size],
-      ["low", (scy - base.cy) / t.drop],
-      ["down", pitch != null && base.pitch != null ? (pitch - base.pitch) / t.pitch : 0],
-      ["tilt", roll != null && base.roll != null ? Math.abs(roll - base.roll) / t.roll : 0],
-    ];
-    scores.sort((p, q) => q[1] - p[1]);
-    const [worst, score] = scores[0];
-    const turned = yaw != null && base.yaw != null && Math.abs(yaw - base.yaw) > YAW_AWAY;
-
-    // Face much smaller than at calibration for a while = laptop or chair moved.
-    this.movedFor = sw / base.w < 0.72 ? this.movedFor + dt : 0;
+    // Much further away, or much higher in the frame, for a while = the camera moved
+    // (laptop raised or moved, lid tilted back, chair moved). Don't nag about posture then.
+    this.movedFor = a.movedNow && !a.away ? this.movedFor + dt : 0;
+    const moved = this.movedFor > MOVED_SEC;
+    // Raising the laptop (or tilting the screen back) without recalibrating looks like sinking or
+    // a dropped chin that never lets up. Real slouches come and go, so ask after a couple of minutes.
+    this.stuckFor = (worst === "low" || worst === "down") && score > STUCK_SCORE && !a.turned ? this.stuckFor + dt : 0;
 
     const prev = this.state.status;
     let status: GuardStatus;
-    if (turned) status = "looking";
+    if (moved) status = "moved";
+    else if (a.away) status = "looking";
     else if (score >= 1) status = worst;
     else if (BAD.includes(prev) && score > RELEASE) status = prev; // hysteresis: no flicker
     else status = "good";
 
     let { badFor, sessionGood, sessionTotal, sessionNudges } = this.state;
-    if (status !== "looking") {
+    if (status !== "looking" && status !== "moved") {
       sessionTotal += dt;
       this.pending.total += dt;
       if (status === "good") {
@@ -352,9 +435,10 @@ class Guard {
       sessionGood,
       sessionTotal,
       sessionNudges,
-      oldCalibration: base1.pitch == null,
-      screen,
-      moved: this.movedFor > 20,
+      oldCalibration: base.em == null,
+      turned: a.turned && status !== "looking" && status !== "moved",
+      maybeMoved: this.stuckFor > STUCK_SEC,
+      moved,
     });
     if (Date.now() - this.lastFlush > 60_000) this.flush();
   }

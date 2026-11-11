@@ -1833,8 +1833,9 @@ p {
   border-radius: 18px;
   overflow: hidden;
   background: #000;
-  aspect-ratio: 4 / 3;
+  aspect-ratio: var(--cam-ar, 4 / 3);
   max-width: 520px;
+  max-height: 70dvh;
   margin: 0 auto;
 }
 .cam video {
@@ -2611,7 +2612,7 @@ button.link {
 .mirror {
   position: relative;
   width: min(42vw, 34dvh, 300px);
-  aspect-ratio: 3 / 4;
+  aspect-ratio: var(--cam-ar, 3 / 4);
   border-radius: 24px;
   overflow: hidden;
   background: rgba(255, 255, 255, 0.05);
@@ -3074,4 +3075,162 @@ button.link {
 .mini-text .mini-stat {
   font-weight: 700;
   animation: fadein 0.4s ease;
+}
+
+/* ---------------- camera in its real shape ---------------- */
+/* a landscape webcam (laptop): wider box, same height budget */
+.mirror.wide {
+  width: min(48vw, calc(30dvh * var(--cam-ar, 1.78)), 420px);
+}
+
+/* ---------------- big screens ---------------- */
+@media (min-width: 900px) and (min-height: 600px) {
+  /* with the camera on, the figure and your camera sit side by side, words underneath */
+  .player-main.has-mirror {
+    flex-direction: column;
+    gap: 14px;
+  }
+  /* the camera and figure take whatever height is left after the words */
+  .player-main.has-mirror .stage-row {
+    gap: 28px;
+    flex: 1 1 0;
+    min-height: 180px;
+    max-height: 560px;
+  }
+  .player-main.has-mirror .player-stage,
+  .player-main.has-mirror .mirror {
+    height: 100%;
+    width: auto;
+    max-width: 30vw;
+  }
+  .player-main.has-mirror .mirror.wide {
+    max-width: 52vw;
+  }
+  .player-main.has-mirror .phase-label {
+    font-size: clamp(2.2rem, 6dvh, 3.4rem);
+  }
+  .player-main.has-mirror .player-text {
+    width: auto;
+    max-width: 760px;
+    min-height: 0;
+    text-align: center;
+  }
+  .player-main.has-mirror .reps {
+    justify-content: center;
+  }
+  .player-main.has-mirror .mirror-fb {
+    font-size: 0.95rem;
+    padding: 9px 12px;
+  }
+}
+
+@media (min-width: 1100px) {
+  .content {
+    max-width: 1180px;
+    margin-left: calc(230px + max(0px, (100vw - 230px - 1180px) / 2));
+    padding: 40px 48px 60px;
+  }
+
+  /* Today: start card beside your level, routines across the bottom */
+  .view.today {
+    display: grid;
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    gap: 18px;
+    align-items: start;
+  }
+  .view.today > * {
+    grid-column: 1 / -1;
+  }
+  .view.today > .hero {
+    grid-column: 1;
+    grid-row: 2;
+    height: 100%;
+  }
+  .view.today > .level-card {
+    grid-column: 2;
+    grid-row: 2;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  /* Routines and Learn: more side by side */
+  .routine-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+  .ex-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  /* Guard: big camera on the left, stats and settings on the right */
+  .guard-cols {
+    display: grid;
+    grid-template-columns: minmax(0, 3fr) minmax(320px, 2fr);
+    gap: 18px;
+    align-items: start;
+  }
+  .guard-main {
+    position: sticky;
+    top: 24px;
+  }
+  .guard-main .cam {
+    max-width: none;
+    max-height: 62dvh;
+  }
+
+  /* Progress: cards in two columns */
+  .view.progress {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+    align-items: start;
+  }
+  .view.progress > * {
+    grid-column: 1 / -1;
+  }
+  .view.progress > .score-card {
+    grid-column: 1;
+    height: 100%;
+  }
+  .view.progress > .report-cta {
+    grid-column: 2;
+    grid-row: 2;
+    height: 100%;
+  }
+  .view.progress > .half {
+    grid-column: auto;
+  }
+
+  /* Settings: two columns of cards */
+  .view.settings {
+    display: block;
+    columns: 2;
+    column-gap: 18px;
+  }
+  .view.settings > * {
+    break-inside: avoid;
+    margin-bottom: 18px;
+  }
+  .view.settings > .view-head {
+    column-span: all;
+  }
+}
+/* Guard columns stack on smaller screens */
+.guard-cols,
+.guard-main,
+.guard-side {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+@media (min-width: 1100px) {
+  .guard-cols {
+    display: grid;
+  }
+}
+/* never crop a landscape camera: show the whole picture */
+.mirror.wide video {
+  object-fit: contain;
 }

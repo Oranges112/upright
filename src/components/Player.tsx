@@ -350,7 +350,7 @@ export default function Player({ routine, onClose }: Props) {
         <span className="pill subtle">{fmtClock(totalSec - elapsedTotal)} left</span>
       </div>
 
-      <main className="player-main">
+      <main className={`player-main ${mirrorOn ? "has-mirror" : ""}`}>
         <div className={`stage-row ${mirrorOn ? "with-mirror" : ""}`}>
         <div className={`player-stage view-${ex.view}`}>
           <div className={`figure-wrap ${step.kind}`}>

@@ -21,8 +21,8 @@ export default function DesktopWidget() {
     void guard.start();
 
     desktopBridge()?.onCommand((cmd) => {
-      if (cmd === "calibrate") guard.calibrate(1);
-      else if (cmd === "calibrate2") guard.calibrate(2);
+      // "calibrate2" comes from older desktop app versions (second-screen mode is gone)
+      if (cmd === "calibrate" || cmd === "calibrate2") guard.calibrate();
       else if (cmd === "pause") guard.stop();
       else if (cmd === "resume") void guard.start();
       else if (cmd === "test") guard.testNudge();

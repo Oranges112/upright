@@ -35,7 +35,7 @@ Nothing to install or sign up for. Open the link on your phone or computer, and 
 | **📚 Learn** | Read about any exercise without doing it: how to do it, why it helps, where to feel it, common mistakes, easier and harder versions. Plus short guides on desk setup, phone posture, sleep, standing posture, gym rules, timelines and when to see a physio. |
 | **💪 Intensity levels** | Gentle → Athlete. Strength moves get longer holds and more reps, stretches stay capped at a safe 30 s, and mobility moves stay easy. After each session it asks "Too easy / Just right / Too hard" and adjusts. |
 | **🔔 Reminders** | Set the interval, active hours and days, with push notifications that have **Start now** and **Snooze** buttons. They work with the app closed, on phone and desktop. |
-| **🛡️ Posture Guard** | Your webcam spots a forward head, slumping, chin dropping and head tilt, then nudges you with a chime and notification. It ignores you glancing at another screen. Runs **100% on-device** (MediaPipe); no video ever leaves your computer. |
+| **🛡️ Posture Guard** | Your webcam spots a forward head, slumping, chin dropping and head tilt, then nudges you with a chime and notification. It keeps checking while you look at a second screen, and tells you to recalibrate if your laptop or camera moves. Runs **100% on-device** (MediaPipe); no video ever leaves your computer. |
 | **🪟 Floating widget** | A tiny always-on-top pill shows your posture live over any app, with what you're doing wrong and how to fix it (Chrome/Edge desktop). |
 | **📈 Progress** | Streaks, XP and levels, a posture score, heatmap, weekly practice vs. neck-comfort chart, plus three self-tests: neck endurance hold, wall test, and a **side-profile photo** that measures your forward-head angle. |
 | **📄 Before & after report** | Compares your first week with the last 7 days, with photos side by side. Print or save as PDF. |
@@ -44,7 +44,7 @@ Nothing to install or sign up for. Open the link on your phone or computer, and 
 
 ## 🪟 Desktop widget (Windows)
 
-A tiny see-through dot that sits on top of every app. It's faded green while your posture is good, and pops out red with what's wrong ("Head forward · Slide your chin back") when you slouch. Drag it anywhere; right-click it (or the tray icon) to recalibrate, set up a second screen, pause, or open the full app.
+A tiny see-through dot that sits on top of every app. It's faded green while your posture is good, and pops out red with what's wrong ("Head forward · Slide your chin back") when you slouch. Drag it anywhere; right-click it (or the tray icon) to recalibrate, pause, or open the full app.
 
 **[⬇️ Download the Windows installer](https://github.com/Oranges112/upright/releases/latest/download/Upright-Setup.exe)** and open it: it installs in a few seconds and starts the widget. (Prefer no install? Get `Upright-Portable.exe` from [Releases](https://github.com/Oranges112/upright/releases).) You can also download it from the **Guard** tab inside the app. Windows may warn that the app isn't from a known publisher, because it isn't code-signed: click **More info → Run anyway**.
 

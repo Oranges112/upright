@@ -16,6 +16,16 @@ export interface Sample {
   pitch: number | null; // (nose y - ear y) / eye distance (bigger = chin down)
   roll: number | null; // eye-line angle in degrees (head tilt)
   yaw: number | null; // nose offset from eye midpoint / eye distance (head turn)
+  /**
+   * Eye-line-to-mouth distance / frame width (bigger = closer). Unlike face width, it barely
+   * changes when you turn your head, so it still measures "head forward" while you look at
+   * another screen.
+   */
+  em?: number | null;
+  /** (nose y - ear y) / eye-to-mouth distance: chin-down measure that survives head turns */
+  pitchM?: number | null;
+  /** eye distance / eye-to-mouth distance: shrinks as you turn (used to undo the turn's effect on tilt) */
+  edm?: number | null;
 }
 
 export interface Box {
@@ -83,14 +93,16 @@ export function measureFace(det: Detection, W: number, H: number): Sample | null
   if (!kp || kp.length < 6) return out;
   // keypoints (normalised 0..1): 0 right eye, 1 left eye, 2 nose tip, 3 mouth, 4 right ear, 5 left ear
   const P = kp.map((p) => ({ x: p.x * W, y: p.y * H }));
-  const [re, le, nose, , rEar, lEar] = P;
+  const [re, le, nose, mouth, rEar, lEar] = P;
   const ed = Math.hypot(le.x - re.x, le.y - re.y);
   if (ed < 4) return out;
   const eyeMid = { x: (re.x + le.x) / 2, y: (re.y + le.y) / 2 };
   const earY = (rEar.y + lEar.y) / 2;
+  const emPx = Math.hypot(mouth.x - eyeMid.x, mouth.y - eyeMid.y);
   let roll = (Math.atan2(le.y - re.y, le.x - re.x) * 180) / Math.PI;
   if (roll > 90) roll -= 180;
   if (roll < -90) roll += 180;
+  const okEm = emPx >= 4;
   return {
     ...out,
     cy: eyeMid.y / H,
@@ -98,7 +110,21 @@ export function measureFace(det: Detection, W: number, H: number): Sample | null
     pitch: (nose.y - earY) / ed,
     roll,
     yaw: (nose.x - eyeMid.x) / ed,
+    em: okEm ? emPx / W : null,
+    pitchM: okEm ? (nose.y - earY) / emPx : null,
+    edm: okEm ? ed / emPx : null,
   };
+}
+
+/**
+ * Open the front camera at the best quality it offers (up to HD), in its natural shape.
+ * Many laptop webcams only give their full, wide view at 16:9, and crop the sides at 4:3.
+ */
+export function openCamera(): Promise<MediaStream> {
+  return navigator.mediaDevices.getUserMedia({
+    video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: "user" },
+    audio: false,
+  });
 }
 
 export const median = (xs: number[]) => {

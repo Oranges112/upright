@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Card, Chips } from "./ui";
 import { BAD, ISSUE, guard, type GuardState, type GuardStatus } from "@/lib/guard";
 import { setMeta, useDoc, useMeta } from "@/lib/store";
+import { useCameraShape } from "./FormCheck";
 import { addDays } from "@/lib/stats";
 import { askPermission } from "@/lib/push";
 import { closeWidget, openWidget, useWidgetWindow, widgetSupported } from "@/lib/widget";
@@ -25,7 +26,8 @@ export const STATUS_UI: Record<GuardStatus, { label: string; tone: "good" | "war
   low: { label: "Sinking in your chair", tone: "bad" },
   down: { label: "Chin dropping", tone: "bad" },
   tilt: { label: "Head tilted", tone: "bad" },
-  looking: { label: "Looking away (not counted)", tone: "idle" },
+  looking: { label: "Turned away (not counted)", tone: "idle" },
+  moved: { label: "Camera moved: recalibrate", tone: "warn" },
   away: { label: "Looking for you…", tone: "idle" },
   error: { label: "Camera problem", tone: "bad" },
 };
@@ -50,6 +52,7 @@ export default function GuardView({ today }: { today: string }) {
   }, [g.stream]);
 
   const running = g.status !== "off" && g.status !== "error";
+  const camShape = useCameraShape(videoRef, g.stream);
   const ui = STATUS_UI[g.status];
 
   // today's totals (all devices) + the unsaved bit from this session
@@ -75,6 +78,8 @@ export default function GuardView({ today }: { today: string }) {
         </div>
       </header>
 
+      <div className="guard-cols">
+      <div className="guard-main">
       <Card className={`guard-hero tone-${ui.tone}`}>
         {!running ? (
           <div className="guard-intro">
@@ -101,19 +106,15 @@ export default function GuardView({ today }: { today: string }) {
           </div>
         ) : (
           <>
-            <div className="cam">
+            <div className="cam" style={camShape}>
               <video ref={videoRef} autoPlay muted playsInline />
               <div className={`cam-status tone-${ui.tone}`}>
                 <i />
-                {g.status === "calibrating"
-                  ? `${g.calibratingScreen === 2 ? "Screen 2: hold still" : "Calibrating"}… ${Math.ceil(g.calibrateLeft)}`
-                  : ui.label}
-                {meta.guardBase2 && running && g.status !== "calibrating" && g.status !== "away" && (
-                  <small className="cam-count">· 🖥️ {g.screen === 2 ? "Screen 2" : "Main screen"}</small>
-                )}
+                {g.status === "calibrating" ? `Calibrating… ${Math.ceil(g.calibrateLeft)}` : ui.label}
+                {g.turned && <small className="cam-count">· 🖥️ other screen</small>}
                 {bad && <small className="cam-count">· chime in {Math.max(0, Math.ceil(delay - g.badFor))}s</small>}
               </div>
-              {g.status !== "uncalibrated" && g.status !== "calibrating" && g.status !== "away" && g.status !== "starting" && (
+              {!["uncalibrated", "calibrating", "away", "starting", "looking", "moved"].includes(g.status) && (
                 <div className="meter">
                   <span>Good</span>
                   <div className="meter-bar">
@@ -158,48 +159,38 @@ export default function GuardView({ today }: { today: string }) {
               </p>
             )}
             {bad && ISSUE[g.status] && <p className="guard-fix">👉 {ISSUE[g.status]!.fix}</p>}
-            {g.oldCalibration && (
-              <p className="row-hint warn center-text">New checks (chin dropping, head tilt) need a fresh calibration. Sit tall and tap Recalibrate.</p>
+            {g.oldCalibration && !g.moved && (
+              <p className="row-hint warn center-text">
+                Upright can now keep checking your posture while you look at another screen. Sit tall, face your main screen and tap Recalibrate to turn it on.
+              </p>
             )}
-            {g.moved && <p className="row-hint warn center-text">Looks like your screen or chair moved. Sit tall and tap Recalibrate.</p>}
+            {g.maybeMoved && !g.moved && (
+              <p className="row-hint warn center-text">
+                Still flagged after a few minutes. Did you raise your laptop or tilt the screen? If so, sit tall and tap Recalibrate.
+              </p>
+            )}
+            {meta.guardBase && !g.moved && (meta.guardBase.cy > 0.7 || meta.guardBase.cy < 0.18) && (
+              <p className="row-hint center-text">
+                Tip: your face sits near the {meta.guardBase.cy > 0.7 ? "bottom" : "top"} of the picture. Tilt the screen so your face is nearer the middle,
+                then recalibrate. It measures more accurately.
+              </p>
+            )}
+            {g.moved && (
+              <p className="row-hint warn center-text">
+                Your camera seems to have moved (laptop raised or moved, or the screen tilted). Posture isn&apos;t being judged until you sit tall and tap
+                Recalibrate.
+              </p>
+            )}
             <p className="tiny muted center-text">
-              Calibrate while sitting tall: ears over shoulders, chin level. Recalibrate if you move your laptop or screen.
+              Calibrate sitting tall and facing your main screen: ears over shoulders, chin level. A raised or tilted laptop is fine, as long as you
+              recalibrate after moving it.
             </p>
           </>
         )}
       </Card>
+      </div>
 
-      {running && meta.guardBase && (
-        <Card>
-          <h3 className="card-title">🖥️ Second screen</h3>
-          {meta.guardBase2 ? (
-            <>
-              <p className="row-hint" style={{ marginTop: 0 }}>
-                ✅ Set up. When you look at your second screen, Guard checks your posture against that position instead of saying you&apos;re looking
-                away.
-              </p>
-              <div className="btn-row">
-                <button className="btn ghost" onClick={() => guard.calibrate(2)} disabled={g.status === "calibrating"}>
-                  Recalibrate screen 2
-                </button>
-                <button className="btn ghost" onClick={() => setMeta({ guardBase2: undefined })}>
-                  Remove
-                </button>
-              </div>
-            </>
-          ) : (
-            <>
-              <p className="row-hint" style={{ marginTop: 0 }}>
-                Use a second monitor? Turn to look at it, sit tall, and tap the button. Guard will then watch your posture on both screens.
-              </p>
-              <button className="btn primary" onClick={() => guard.calibrate(2)} disabled={g.status === "calibrating"}>
-                Calibrate my second screen
-              </button>
-            </>
-          )}
-        </Card>
-      )}
-
+      <div className="guard-side">
       <DesktopDownload />
 
       <div className="stat-grid three">
@@ -257,8 +248,8 @@ export default function GuardView({ today }: { today: string }) {
           />
         </div>
         <p className="row-hint">
-          <b>What it checks:</b> head pushed toward the screen, sinking into your chair, chin dropping, and head tilted to one side. Glancing at
-          another screen or turning to talk isn&apos;t counted.
+          <b>What it checks:</b> head pushed toward the screen, sinking into your chair, chin dropping, and head tilted to one side. It keeps checking
+          while you look at a second screen. Only turning right round (to talk to someone) isn&apos;t counted.
         </p>
         <p className="row-hint">
           <b>When do nudges happen?</b> If you slouch for {delay < 60 ? `${delay} seconds` : `${delay / 60} min`} in a row, you get a chime and a pop-up. Sitting
@@ -266,6 +257,8 @@ export default function GuardView({ today }: { today: string }) {
         </p>
         <p className="row-hint">Keep the Upright tab open (it can be behind other windows). Use “Float on top” to see your posture over any app.</p>
       </Card>
+      </div>
+      </div>
     </div>
   );
 }

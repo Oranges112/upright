@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { Step } from "@/lib/exercises";
-import { detectFace, getFaceDetector, measureFace, median, type Sample } from "@/lib/face";
+import { detectFace, getFaceDetector, measureFace, median, openCamera, type Sample } from "@/lib/face";
 import { RepScorer, isChecked, isScoredPhase, judge, type Baseline, type Feedback } from "@/lib/formcheck";
 import { guard } from "@/lib/guard";
 
@@ -59,7 +59,7 @@ export function useFormCheck(on: boolean, step: Step | undefined, idx: number, p
         const stream =
           shared && shared.active
             ? shared
-            : (own = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" }, audio: false }));
+            : (own = await openCamera());
         if (cancelled) return;
         const v = videoRef.current;
         if (v) {
@@ -150,9 +150,34 @@ function baselineFrom(xs: Sample[]): Baseline | null {
   return { w: med("w")!, pitch: med("pitch"), roll: med("roll"), yaw: med("yaw") };
 }
 
+/**
+ * The camera's real shape (e.g. 16:9 on a laptop, 3:4 on a phone held upright), as a CSS
+ * variable, so the preview shows the whole picture instead of a cropped slice.
+ */
+export function useCameraShape(videoRef: React.RefObject<HTMLVideoElement | null>, dep?: unknown): React.CSSProperties & { [k: `--${string}`]: string } {
+  const [ar, setAr] = useState<number | null>(null);
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+    const read = () => {
+      if (v.videoWidth && v.videoHeight) setAr(v.videoWidth / v.videoHeight);
+    };
+    read();
+    v.addEventListener("loadedmetadata", read);
+    v.addEventListener("resize", read); // phone rotated
+    return () => {
+      v.removeEventListener("loadedmetadata", read);
+      v.removeEventListener("resize", read);
+    };
+  }, [videoRef, dep]);
+  return ar ? { "--cam-ar": String(ar) } : {};
+}
+
 /** The mirror box: your camera (mirrored) with live feedback on top. */
 export function Mirror({ fc, exerciseId }: { fc: FormCheck; exerciseId: string }) {
   const checked = isChecked(exerciseId);
+  const shape = useCameraShape(fc.videoRef, fc.cam);
+  const wide = Number(shape["--cam-ar"] ?? 0) > 1;
   const msg =
     fc.cam === "error"
       ? { tone: "bad", text: fc.error ?? "Camera problem" }
@@ -164,7 +189,7 @@ export function Mirror({ fc, exerciseId }: { fc: FormCheck; exerciseId: string }
             ? { tone: "info", text: "Watch your shoulders in the mirror." }
             : fc.feedback ?? { tone: "info", text: "Sit tall. I'm watching your form." };
   return (
-    <div className="mirror">
+    <div className={`mirror ${wide ? "wide" : ""}`} style={shape}>
       <video ref={fc.videoRef} autoPlay muted playsInline />
       <div className={`mirror-fb tone-${msg.tone}`}>{msg.text}</div>
       {checked && fc.score.total > 0 && (
