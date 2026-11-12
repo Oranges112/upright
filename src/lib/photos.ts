@@ -15,6 +15,8 @@ export interface PhotoRecord {
   shoulder: Pt;
   w: number;
   h: number;
+  /** found automatically when the photo shows more of you (for the full-body check) */
+  body?: { hip?: Pt; knee?: Pt; ankle?: Pt; nose?: Pt };
 }
 
 const DB = "upright-photos";
@@ -83,4 +85,18 @@ export function angleVerdict(deg: number) {
   if (deg <= 10) return { label: "Ears over shoulders 🙌", tone: "good" as const };
   if (deg <= 20) return { label: "Mild forward head", tone: "warn" as const };
   return { label: "Noticeable forward head", tone: "bad" as const };
+}
+
+/** Every saved photo, oldest first. */
+export async function allPhotos(): Promise<PhotoRecord[]> {
+  try {
+    const db = await open();
+    return await new Promise((resolve) => {
+      const req = db.transaction(STORE).objectStore(STORE).getAll();
+      req.onsuccess = () => resolve(((req.result as PhotoRecord[]) ?? []).sort((a, b) => a.at - b.at));
+      req.onerror = () => resolve([]);
+    });
+  } catch {
+    return [];
+  }
 }

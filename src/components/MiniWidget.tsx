@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { BAD, ISSUE, guard } from "@/lib/guard";
 import { useMeta } from "@/lib/store";
+import { NO_HOLD, nextHold, type Hold } from "@/lib/hold";
 import { claimRecentSlot, recentLabel, recentSummary, trackRecent } from "@/lib/recent";
 import { useGuard } from "./GuardView";
 import { desktopBridge } from "@/lib/desktop";
@@ -42,10 +43,10 @@ export default function MiniWidget({ today, mode = "pip" }: { today: string; mod
   }, []);
 
   // how long you've held good posture without slipping
-  const goodSince = useRef<number | null>(null);
-  if (g.status === "good") goodSince.current ??= now;
-  else if (BAD.includes(g.status) || g.status === "off") goodSince.current = null;
-  const goodFor = goodSince.current ? (now - goodSince.current) / 1000 : 0;
+  // (forgiving: a slip of under 20 s doesn't reset it, see lib/hold.ts)
+  const hold = useRef<Hold>(NO_HOLD);
+  hold.current = nextHold(hold.current, g.status === "good" ? "good" : BAD.includes(g.status) ? "bad" : g.status === "off" ? "off" : "other", now);
+  const goodFor = hold.current.since ? (now - hold.current.since) / 1000 : 0;
 
   const running = g.status !== "off" && g.status !== "error";
   const bad = BAD.includes(g.status);

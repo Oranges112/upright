@@ -3249,3 +3249,242 @@ button.link {
   background: linear-gradient(90deg, var(--accent), var(--accent-2));
   transition: width 0.3s ease;
 }
+
+/* ---------------- browser floating window: as close to the desktop pill as a browser allows ----------------
+   (a browser always adds a title bar and can't make the window see-through, so the pill fills
+   the whole window edge to edge, and fades back while your posture is fine) */
+.widget-body {
+  background: color-mix(in srgb, var(--tone, #94a3b8) 10%, var(--bg));
+}
+.widget-body .mini-stage:not(.desk) {
+  padding: 0;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--tone) 22%, var(--card)), color-mix(in srgb, var(--tone) 6%, var(--bg)));
+}
+.widget-body .mini-stage:not(.desk) .mini-pill {
+  max-height: none;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  background: none;
+  gap: 8px;
+  padding: 0 8px 0 5px;
+}
+.widget-body .mini-stage:not(.desk) .mini-ring {
+  height: calc(100% - 10px);
+  max-height: 42px;
+  background: transparent;
+}
+.widget-body .mini-stage:not(.desk) .mini-text b {
+  font-size: 0.82rem;
+}
+.widget-body .mini-stage:not(.desk) .mini-text span {
+  font-size: 0.7rem;
+}
+.widget-body .mini-stage:not(.desk) .mini-icon {
+  width: 24px;
+  height: 24px;
+}
+/* sitting well: fade the text back so it's out of the way, like the desktop dot */
+.widget-body .mini-stage.tone-good:not(.desk) .mini-text,
+.widget-body .mini-stage.tone-good:not(.desk) .mini-icon,
+.widget-body .mini-stage.tone-idle:not(.desk) .mini-text {
+  opacity: 0.55;
+  transition: opacity 0.4s ease;
+}
+
+/* ---------------- side-photo body scan ---------------- */
+.photo-frame.auto {
+  cursor: default;
+}
+.photo-frame.scanning::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, transparent 0%, color-mix(in srgb, var(--accent) 35%, transparent) 50%, transparent 100%);
+  background-size: 100% 40%;
+  background-repeat: no-repeat;
+  animation: scanline 1.4s ease-in-out infinite;
+}
+@keyframes scanline {
+  from {
+    background-position: 0 -40%;
+  }
+  to {
+    background-position: 0 140%;
+  }
+}
+.photo-overlay .body-line {
+  fill: none;
+  stroke: #facc15;
+  stroke-width: 2.5;
+  stroke-linejoin: round;
+}
+.photo-overlay .dot.body {
+  fill: #facc15;
+}
+.body-checks {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0 4px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--card-2);
+  border: 1px solid var(--border);
+}
+.body-check {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+.body-check i {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: var(--good);
+}
+.body-check.tone-warn i {
+  background: #f59e0b;
+}
+.body-check.tone-bad i {
+  background: var(--danger);
+}
+.body-check em {
+  font-style: normal;
+  color: var(--muted);
+}
+.body-check small {
+  display: block;
+  color: var(--muted);
+}
+
+/* ---------------- monthly photo reminder ---------------- */
+.photo-reminder {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px 14px;
+  align-items: center;
+}
+.photo-reminder > div:nth-child(2) {
+  display: grid;
+  gap: 3px;
+}
+.photo-reminder small {
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+.photo-reminder .btn-row {
+  grid-column: 1 / -1;
+}
+
+/* ---------------- before / after photo slider ---------------- */
+.compare-pick {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.compare-pick label {
+  flex: 1;
+  display: grid;
+  gap: 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+.compare-pick select {
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--card-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.85rem;
+}
+.compare-box {
+  position: relative;
+  width: min(100%, 420px);
+  margin: 0 auto;
+  aspect-ratio: 3 / 4;
+  overflow: hidden;
+  border-radius: 16px;
+  background: #0b0f1a;
+  touch-action: none;
+  cursor: ew-resize;
+  user-select: none;
+}
+.compare-box img {
+  position: absolute;
+  max-width: none;
+  height: auto;
+  pointer-events: none;
+  transform-origin: center;
+}
+.compare-top {
+  position: absolute;
+  inset: 0;
+}
+.compare-plumb {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 2px dashed rgba(255, 255, 255, 0.7);
+  pointer-events: none;
+}
+.compare-handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  margin-left: -1.5px;
+  background: white;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+}
+.compare-handle b {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: white;
+  color: #0f172a;
+  font-size: 0.85rem;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.4);
+}
+.compare-tag {
+  position: absolute;
+  top: 10px;
+  padding: 4px 9px;
+  border-radius: 99px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: white;
+  background: rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+}
+.compare-tag.left {
+  left: 10px;
+}
+.compare-tag.right {
+  right: 10px;
+}
+.compare-range {
+  width: min(100%, 420px);
+  display: block;
+  margin: 10px auto 4px;
+  accent-color: var(--accent);
+}
+.compare .up {
+  color: var(--good);
+}
+.compare .down {
+  color: #f59e0b;
+}

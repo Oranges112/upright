@@ -56,7 +56,9 @@ export async function openWidget(): Promise<boolean> {
   const dpip = (window as any).documentPictureInPicture;
   if (!dpip) return false;
   try {
-    const w: Window = await dpip.requestWindow({ width: 250, height: 76, disallowReturnToOpener: true });
+    // preferInitialWindowPlacement: always open at this small size, instead of Chrome reusing
+    // whatever size the window had last time (it remembers per site, so it could stay big)
+    const w: Window = await dpip.requestWindow({ width: 232, height: 52, disallowReturnToOpener: true, preferInitialWindowPlacement: true });
     copyStyles(w);
     w.document.title = "Upright";
     w.document.documentElement.className = document.documentElement.className;

@@ -8,6 +8,7 @@ import { addDays, bestStreak, consistency, countsByDay, currentStreak, postureSc
 import { addTest } from "@/lib/store";
 import { sound } from "@/lib/sound";
 import PhotoTest from "./PhotoTest";
+import PhotoCompare from "./PhotoCompare";
 import Report from "./Report";
 
 export default function Progress({ doc, today }: { doc: Doc; today: string }) {
@@ -82,6 +83,8 @@ export default function Progress({ doc, today }: { doc: Doc; today: string }) {
         <TestRow doc={doc} type="wall" title="Wall test (head-to-wall gap)" unit="cm" better="lower" onStart={() => setTest("wall")} />
         <TestRow doc={doc} type="angle" title="Side-profile photo (head angle)" unit="°" better="lower" onStart={() => setTest("angle")} />
       </Card>
+
+      <PhotoCompare doc={doc} />
 
       <p className="disclaimer">
         Upright is a habit tool, not medical advice. If you have sharp pain, numbness, tingling, or dizziness, stop and see a physio or doctor.

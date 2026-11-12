@@ -8,6 +8,7 @@ import type { Doc } from "@/lib/types";
 import { addDays, countsByDay, currentStreak, levelFor, totalXp, weekdayOf } from "@/lib/stats";
 import { nextReminderAt } from "@/lib/schedule";
 import { lastSessionEnd, type Meta } from "@/lib/store";
+import PhotoReminder from "./PhotoReminder";
 
 const DAY_LETTERS = ["S", "M", "T", "W", "T", "F", "S"];
 
@@ -119,6 +120,8 @@ export default function Today({
       </Card>
 
       {setupCard}
+
+      <PhotoReminder doc={doc} />
 
       <div className="week-strip">
         {week.map((d) => {
