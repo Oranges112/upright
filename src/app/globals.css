@@ -3488,3 +3488,22 @@ button.link {
 .compare .down {
   color: #f59e0b;
 }
+
+/* the dot shows your "holding" minutes while you sit well */
+.mini-count-text text {
+  fill: color-mix(in srgb, var(--tone) 55%, var(--text));
+  font-family: inherit;
+  font-weight: 800;
+}
+.mini-count-text .big {
+  font-size: 13px;
+  letter-spacing: -0.5px;
+}
+.mini-count-text .small {
+  font-size: 6px;
+  font-weight: 700;
+  opacity: 0.9;
+}
+.desk.dot.tone-good.counting {
+  opacity: 0.85;
+}

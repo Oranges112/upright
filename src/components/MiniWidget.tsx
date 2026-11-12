@@ -169,6 +169,12 @@ export default function MiniWidget({ today, mode = "pip" }: { today: string; mod
     else if (g.status === "uncalibrated" || g.status === "moved") guard.calibrate();
   };
 
+  // the small dot shows how long you've held good posture, once it's a minute or more
+  const showCount = desktop && !expanded && g.status === "good" && goodFor >= 60;
+  const mins = Math.floor(goodFor / 60);
+  const countBig = mins < 60 ? `${mins}` : `${Math.floor(mins / 60)}h`;
+  const countSmall = mins < 60 ? "min" : `${mins % 60}m`;
+
   const ringSvg = (
     <svg className="mini-ring" viewBox="0 0 36 36" aria-hidden>
       <circle cx="18" cy="18" r="15" className="track" />
@@ -182,6 +188,16 @@ export default function MiniWidget({ today, mode = "pip" }: { today: string; mod
         transform="rotate(-90 18 18)"
         style={ringColor ? { stroke: ringColor } : undefined}
       />
+      {showCount ? (
+        <g className="mini-count-text">
+          <text x="18" y="20.5" textAnchor="middle" className="big">
+            {countBig}
+          </text>
+          <text x="18" y="27.5" textAnchor="middle" className="small">
+            {countSmall}
+          </text>
+        </g>
+      ) : (
       <g className="mini-body">
         <path d="M12 28 Q18 24.5 24 28" className="shoulders" />
         <g style={{ transform: `translate(${head.x}px, ${head.y}px) rotate(${head.r}deg)`, transformOrigin: "18px 24px", transition: "transform .5s ease" }}>
@@ -189,12 +205,13 @@ export default function MiniWidget({ today, mode = "pip" }: { today: string; mod
           <circle cx="18" cy="15" r="4.4" className="head" />
         </g>
       </g>
+      )}
     </svg>
   );
 
   return (
     <div
-      className={`mini-stage tone-${tone} ${flash ? "flash" : ""} ${desktop ? "desk" : ""} ${expanded ? "open" : "dot"} ${flip ? "flip" : ""}`}
+      className={`mini-stage tone-${tone} ${showCount ? "counting" : ""} ${flash ? "flash" : ""} ${desktop ? "desk" : ""} ${expanded ? "open" : "dot"} ${flip ? "flip" : ""}`}
       onMouseEnter={() => {
         if (leaveTimer.current) clearTimeout(leaveTimer.current);
         setHover(true);
