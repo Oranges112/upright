@@ -247,6 +247,16 @@ export default function GuardView({ today }: { today: string }) {
             format={(v) => (v < 60 ? `${v}s` : `${v / 60} min`)}
           />
         </div>
+        <div className="field-block">
+          <span className="row-label">Start the &ldquo;Holding for&rdquo; count over after slouching for</span>
+          <Chips
+            options={[0, 10, 20, 60, 120]}
+            value={meta.holdResetSec ?? 0}
+            onChange={(v) => setMeta({ holdResetSec: v === 0 ? undefined : v })}
+            format={(v) => (v === 0 ? `Just after the nudge (${delay + 5}s)` : v < 60 ? `${v}s` : `${v / 60} min`)}
+          />
+          <span className="row-hint">Shorter slips don&apos;t break your streak. Lower it to be stricter with yourself.</span>
+        </div>
         <p className="row-hint">
           <b>What it checks:</b> head pushed toward the screen, sinking into your chair, chin dropping, and head tilted to one side. It keeps checking
           when you look at a second screen or turn away. Only when the camera can&apos;t see your face at all is the time not counted.

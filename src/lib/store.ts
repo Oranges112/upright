@@ -37,6 +37,8 @@ export interface Meta {
   guardBase?: GuardBase;
   guardSensitivity?: 1 | 2 | 3;
   guardDelaySec?: number;
+  /** seconds of slouching in a row before "Holding for..." starts over (unset = just after the nudge) */
+  holdResetSec?: number;
 }
 
 export interface ServerConfig {
