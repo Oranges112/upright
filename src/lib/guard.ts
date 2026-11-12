@@ -32,7 +32,7 @@ export type GuardStatus =
   | "low" // sinking into the chair
   | "down" // chin dropped / looking down
   | "tilt" // head tilted to one side
-  | "looking" // turned far away (talking to someone behind you): not counted
+  | "looking" // no longer used: turning away is still judged (kept so old saved states still parse)
   | "moved" // the camera moved since calibrating: not counted until you recalibrate
   | "away"
   | "error";
@@ -80,7 +80,10 @@ export const THRESH: Record<1 | 2 | 3, { size: number; drop: number; pitch: numb
  * Head turn, as nose offset / eye distance (about 0.55 x tan(angle)):
  *  - under TURN_SMALL (~15°) you're facing the screen: every measure is reliable
  *  - up to TURN_AWAY (~55°) you're looking at another screen: judged with turn-proof measures
- *  - beyond that you've turned right away (talking to someone): not judged
+ *  - beyond that you've turned right away: still judged, on the measures that survive a big turn
+ *    (sinking, leaning in, chin dropping). Looking away is no excuse to slouch. Only head tilt is
+ *    skipped, because a side-on face makes it unreliable. If the camera can't see your face at all,
+ *    nothing can be measured, so that time isn't counted.
  */
 const TURN_SMALL = 0.15;
 const TURN_OLD = 0.32; // old calibrations (no turn-proof measures) stop judging here, as before
@@ -104,7 +107,7 @@ export interface Assessment {
   scores: [GuardStatus, number][];
   /** turned toward another screen (still judged) */
   turned: boolean;
-  /** turned right away: don't judge */
+  /** turned right away: judged on fewer measures */
   away: boolean;
   /** how big your face is vs calibration (1 = same distance), turn-proof when possible */
   size: number | null;
@@ -121,21 +124,22 @@ export function assess(m: Measures, base: GuardBase, t: Thresholds): Assessment 
   const proof = base.em != null && m.em != null; // turn-proof measures available
   const away = turn > (proof ? TURN_AWAY : TURN_OLD);
   const turned = !away && turn >= TURN_SMALL;
-  const k = turned ? TURNED_SLACK : 1;
+  const k = turned || away ? TURNED_SLACK : 1;
 
   // distance to the camera: face width shrinks as you turn, eye-to-mouth doesn't
   const rW = m.w / base.w;
   const rEm = proof ? m.em! / base.em! : null;
-  const size = rEm == null ? (turned ? null : rW) : turned ? rEm : (rW + rEm) / 2;
+  // turned right away both shrink, so the larger one is the fairest (never flags you for turning)
+  const size = away ? (rEm == null ? null : Math.max(rW, rEm)) : rEm == null ? (turned ? null : rW) : turned ? rEm : (rW + rEm) / 2;
 
   // chin down: ear-to-nose height over eye-to-mouth survives turning; the old measure doesn't
   let down = 0;
   if (base.pitchM != null && m.pitchM != null) down = (m.pitchM - base.pitchM) / t.pitch;
-  else if (!turned && base.pitch != null && m.pitch != null) down = (m.pitch - base.pitch) / t.pitch;
+  else if (!turned && !away && base.pitch != null && m.pitch != null) down = (m.pitch - base.pitch) / t.pitch;
 
   // tilt: turning squashes the eye line sideways, which exaggerates the angle; undo that
   let tilt = 0;
-  if (m.roll != null && base.roll != null) {
+  if (!away && m.roll != null && base.roll != null) {
     let roll = m.roll;
     if (turned && m.edm != null && base.edm != null && base.edm > 0) {
       const squash = Math.min(1, m.edm / base.edm);
@@ -396,12 +400,11 @@ class Guard {
     const moved = this.movedFor > MOVED_SEC;
     // Raising the laptop (or tilting the screen back) without recalibrating looks like sinking or
     // a dropped chin that never lets up. Real slouches come and go, so ask after a couple of minutes.
-    this.stuckFor = (worst === "low" || worst === "down") && score > STUCK_SCORE && !a.turned ? this.stuckFor + dt : 0;
+    this.stuckFor = (worst === "low" || worst === "down") && score > STUCK_SCORE && !a.turned && !a.away ? this.stuckFor + dt : 0;
 
     const prev = this.state.status;
     let status: GuardStatus;
     if (moved) status = "moved";
-    else if (a.away) status = "looking";
     else if (score >= 1) status = worst;
     else if (BAD.includes(prev) && score > RELEASE) status = prev; // hysteresis: no flicker
     else status = "good";
@@ -425,7 +428,7 @@ class Guard {
           badFor = 0;
         }
       }
-    } // while looking away the slouch timer just holds
+    }
     this.set({
       w: sw,
       cy: scy,
@@ -436,7 +439,7 @@ class Guard {
       sessionTotal,
       sessionNudges,
       oldCalibration: base.em == null,
-      turned: a.turned && status !== "looking" && status !== "moved",
+      turned: (a.turned || a.away) && status !== "moved",
       maybeMoved: this.stuckFor > STUCK_SEC,
       moved,
     });

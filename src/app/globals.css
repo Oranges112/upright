@@ -3234,3 +3234,18 @@ button.link {
 .mirror.wide video {
   object-fit: contain;
 }
+
+/* desktop app: update download progress */
+.update-bar {
+  height: 6px;
+  border-radius: 99px;
+  background: var(--track);
+  overflow: hidden;
+  margin: 4px 0 10px;
+}
+.update-bar i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  transition: width 0.3s ease;
+}

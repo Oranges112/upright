@@ -112,13 +112,40 @@ describe("Posture Guard: looking at a second screen", () => {
       expect(v).toBeGreaterThan(1);
     });
   }
-  it("turned right round (talking to someone) isn't judged", () => {
-    expect(assess(sample({ yaw: 70 }), base, t).away).toBe(true);
+});
+
+describe("Posture Guard: turned right away is no excuse", () => {
+  for (const yaw of [65, 75]) {
+    it(`turned ${yaw}° with good posture stays good`, () => {
+      const a = assess(sample({ yaw }), base, t);
+      expect(a.away).toBe(true);
+      expect(a.scores[0][1]).toBeLessThan(0.75);
+    });
+    it(`turned ${yaw}° and sinking is caught`, () => {
+      const [s, v] = worst({ yaw, drop: 60 });
+      expect(s).toBe("low");
+      expect(v).toBeGreaterThan(1);
+    });
+    it(`turned ${yaw}° and dropping the chin is caught`, () => {
+      const [s, v] = worst({ yaw, pitch: 25 });
+      expect(s).toBe("down");
+      expect(v).toBeGreaterThan(1);
+    });
+  }
+  it("turned 65° and leaning in is caught", () => {
+    const [s, v] = worst({ yaw: 65, dist: 460 });
+    expect(s).toBe("forward");
+    expect(v).toBeGreaterThan(1);
   });
-  it("old calibrations (no turn-proof measures) stop judging past ~30°, as before", () => {
+  it("head tilt isn't judged when turned right away (a side-on face fakes it)", () => {
+    const a = assess(sample({ yaw: 75, drop: 60 }), base, t);
+    expect(a.scores.find(([k]) => k === "tilt")![1]).toBe(0);
+  });
+  it("old calibrations (no turn-proof measures) still catch sinking when turned away", () => {
     const old: GuardBase = { ...base, em: undefined, pitchM: undefined, edm: undefined };
     expect(assess(sample({ yaw: 40 }), old, t).away).toBe(true);
-    expect(assess(sample({ yaw: 10 }), old, t).away).toBe(false);
+    expect(worst({ yaw: 40, drop: 60 }, old)[0]).toBe("low");
+    expect(worst({ yaw: 40 }, old)[1]).toBeLessThan(0.75);
   });
 });
 

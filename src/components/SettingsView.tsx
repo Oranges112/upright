@@ -1,6 +1,7 @@
 "use client";
 
 import DesktopDownload from "./DesktopDownload";
+import DesktopUpdates from "./DesktopUpdates";
 import NotifCheck from "./NotifCheck";
 import { useEffect, useState } from "react";
 import { Card, Chips, Toggle, hourLabel } from "./ui";
@@ -357,6 +358,7 @@ export default function SettingsView({ doc, meta, config, installPrompt }: { doc
       </Card>
 
       <DesktopDownload />
+      <DesktopUpdates />
       {checkOpen && <NotifCheck onClose={() => setCheckOpen(false)} />}
 
       <Card>

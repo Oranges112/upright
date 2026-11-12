@@ -26,7 +26,7 @@ export const STATUS_UI: Record<GuardStatus, { label: string; tone: "good" | "war
   low: { label: "Sinking in your chair", tone: "bad" },
   down: { label: "Chin dropping", tone: "bad" },
   tilt: { label: "Head tilted", tone: "bad" },
-  looking: { label: "Turned away (not counted)", tone: "idle" },
+  looking: { label: "Turned away", tone: "idle" },
   moved: { label: "Camera moved: recalibrate", tone: "warn" },
   away: { label: "Looking for you…", tone: "idle" },
   error: { label: "Camera problem", tone: "bad" },
@@ -111,7 +111,7 @@ export default function GuardView({ today }: { today: string }) {
               <div className={`cam-status tone-${ui.tone}`}>
                 <i />
                 {g.status === "calibrating" ? `Calibrating… ${Math.ceil(g.calibrateLeft)}` : ui.label}
-                {g.turned && <small className="cam-count">· 🖥️ other screen</small>}
+                {g.turned && <small className="cam-count">· 👀 turned, still checking</small>}
                 {bad && <small className="cam-count">· chime in {Math.max(0, Math.ceil(delay - g.badFor))}s</small>}
               </div>
               {!["uncalibrated", "calibrating", "away", "starting", "looking", "moved"].includes(g.status) && (
@@ -249,7 +249,7 @@ export default function GuardView({ today }: { today: string }) {
         </div>
         <p className="row-hint">
           <b>What it checks:</b> head pushed toward the screen, sinking into your chair, chin dropping, and head tilted to one side. It keeps checking
-          while you look at a second screen. Only turning right round (to talk to someone) isn&apos;t counted.
+          when you look at a second screen or turn away. Only when the camera can&apos;t see your face at all is the time not counted.
         </p>
         <p className="row-hint">
           <b>When do nudges happen?</b> If you slouch for {delay < 60 ? `${delay} seconds` : `${delay / 60} min`} in a row, you get a chime and a pop-up. Sitting

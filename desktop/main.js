@@ -3,7 +3,7 @@
  * A tiny frameless, see-through, always-on-top posture dot. It loads the Upright
  * web app's /widget page, which runs Posture Guard on your webcam (all on-device).
  */
-const { app, BrowserWindow, Menu, Tray, ipcMain, screen, session, shell, nativeImage } = require("electron");
+const { app, BrowserWindow, Menu, Notification, Tray, ipcMain, screen, session, shell, nativeImage } = require("electron");
 const path = require("path");
 const fs = require("fs");
 
@@ -196,6 +196,94 @@ function handleLink(url) {
 }
 const linkFrom = (argv) => argv.find((a) => typeof a === "string" && a.startsWith(`${PROTOCOL}://`));
 
+/* ---------- automatic updates (from the GitHub releases) ---------- */
+// Checks on start and every few hours, downloads quietly, then offers "Restart to update".
+// If you don't, it installs the next time Upright quits.
+let updater = null;
+/** idle | checking | none | downloading | ready | error */
+let update = { state: "idle", version: null, pct: 0 };
+const UPDATE_EVERY = 4 * 3600_000;
+
+function setUpdate(patch) {
+  update = { ...update, ...patch };
+  for (const w of [appWin, widget]) if (w && !w.isDestroyed()) w.webContents.send("update", updateInfo());
+}
+function updateInfo() {
+  return { ...update, current: app.getVersion() };
+}
+function updateLabel() {
+  switch (update.state) {
+    case "checking":
+      return "Checking for updates…";
+    case "downloading":
+      return `Downloading update… ${update.pct}%`;
+    case "ready":
+      return `Restart to update to ${update.version}`;
+    case "none":
+      return `Up to date (${app.getVersion()}) · check again`;
+    case "error":
+      return "Couldn't check for updates · try again";
+    default:
+      return "Check for updates";
+  }
+}
+function notify(title, body, onClick) {
+  if (!Notification.isSupported()) return;
+  const n = new Notification({ title, body, icon: path.join(__dirname, "icon.png") });
+  if (onClick) n.on("click", onClick);
+  n.show();
+}
+let manualCheck = false;
+function checkForUpdates(manual = false) {
+  if (!updater) {
+    if (manual) notify("Updates", "Automatic updates only work in the installed app (Upright-Setup.exe).");
+    return;
+  }
+  if (update.state === "downloading" || update.state === "checking") return;
+  if (update.state === "ready") return installUpdate();
+  manualCheck = manual;
+  setUpdate({ state: "checking" });
+  updater.checkForUpdates().catch(() => setUpdate({ state: "error" }));
+}
+function installUpdate() {
+  if (update.state !== "ready" || !updater) return;
+  setImmediate(() => updater.quitAndInstall(true, true));
+}
+function setupUpdates() {
+  if (!app.isPackaged) return; // a development copy never updates itself
+  // testing: UPRIGHT_UPDATE_URL points a test copy at a local update server
+  if (process.env.UPRIGHT_PROFILE && !process.env.UPRIGHT_UPDATE_URL) return;
+  try {
+    updater = require("electron-updater").autoUpdater;
+  } catch {
+    return;
+  }
+  if (process.env.UPRIGHT_UPDATE_URL) updater.setFeedURL({ provider: "generic", url: process.env.UPRIGHT_UPDATE_URL });
+  updater.autoDownload = true;
+  // a test copy must never install anything
+  if (process.env.UPRIGHT_PROFILE) updater.autoInstallOnAppQuit = false;
+  if (!process.env.UPRIGHT_PROFILE) updater.autoInstallOnAppQuit = true;
+  updater.on("update-available", (i) => setUpdate({ state: "downloading", version: i.version, pct: 0 }));
+  updater.on("download-progress", (p) => setUpdate({ state: "downloading", pct: Math.round(p.percent || 0) }));
+  updater.on("update-not-available", () => {
+    setUpdate({ state: "none" });
+    if (manualCheck) notify("Upright is up to date", `You have the newest version (${app.getVersion()}).`);
+  });
+  updater.on("update-downloaded", (i) => {
+    setUpdate({ state: "ready", version: i.version });
+    notify(`Upright ${i.version} is ready`, "Click to restart and update now, or it'll update the next time Upright closes.", installUpdate);
+  });
+  updater.on("error", () => {
+    setUpdate({ state: "error" });
+    if (manualCheck) notify("Couldn't check for updates", "Check your internet connection and try again.");
+  });
+  setTimeout(() => checkForUpdates(false), 15_000);
+  setInterval(() => checkForUpdates(false), UPDATE_EVERY);
+}
+ipcMain.handle("update:get", () => updateInfo());
+ipcMain.on("update:check", () => checkForUpdates(true));
+ipcMain.on("update:install", () => installUpdate());
+
 function send(cmd) {
   if (widget) widget.webContents.send("cmd", cmd);
 }
@@ -203,6 +291,7 @@ function send(cmd) {
 function menu() {
   return Menu.buildFromTemplate([
     { label: `Upright: ${status.label}`, enabled: false },
+    ...(update.state === "ready" ? [{ label: `⬆ Restart to update to ${update.version}`, click: installUpdate }] : []),
     { type: "separator" },
     { label: "Recalibrate (sit tall first)", click: () => send("calibrate") },
     { label: "Test a nudge", click: () => send("test") },
@@ -227,6 +316,8 @@ function menu() {
       click: (item) => app.setLoginItemSettings({ openAtLogin: item.checked }),
     },
     { type: "separator" },
+    { label: updateLabel(), enabled: update.state !== "checking" && update.state !== "downloading", click: () => checkForUpdates(true) },
+    { label: `Version ${app.getVersion()}`, enabled: false },
     { label: "Quit Upright", click: () => app.quit() },
   ]);
 }
@@ -282,7 +373,7 @@ if (!app.requestSingleInstanceLock()) {
     }
   });
   // register upright:// links (the installer also does this); skip in development so we don't point Windows at a dev build
-  if (app.isPackaged) app.setAsDefaultProtocolClient(PROTOCOL);
+  if (app.isPackaged && !process.env.UPRIGHT_PROFILE) app.setAsDefaultProtocolClient(PROTOCOL);
   app.whenReady().then(() => {
     cfg = loadCfg();
     if (!cfg.url) {
@@ -298,6 +389,7 @@ if (!app.requestSingleInstanceLock()) {
 
     createWidget();
     createTray();
+    setupUpdates();
     // launched by a link (e.g. "Open Upright" on the website)
     const first = linkFrom(process.argv);
     if (first) widget.once("ready-to-show", () => handleLink(first));

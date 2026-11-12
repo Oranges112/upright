@@ -1,7 +1,7 @@
 {
   "name": "upright-desktop",
   "productName": "Upright",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "Upright posture widget: a tiny always-on-top dot that warns you when you slouch.",
   "author": "Oranges112",
   "license": "MIT",
@@ -45,10 +45,19 @@
           "upright"
         ]
       }
+    ],
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "https://github.com/Oranges112/upright/releases/latest/download"
+      }
     ]
   },
   "devDependencies": {
     "electron": "^45.2.3",
     "electron-builder": "^26.18.0"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.11"
   }
 }

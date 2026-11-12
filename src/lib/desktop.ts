@@ -16,9 +16,23 @@ export function desktopBridge(): DesktopBridge | undefined {
 }
 
 /** Bridge in the desktop app's full-app window (see desktop/appPreload.js). Absent in a normal browser. */
+export interface UpdateInfo {
+  state: "idle" | "checking" | "none" | "downloading" | "ready" | "error";
+  /** the new version, once one is found */
+  version: string | null;
+  pct: number;
+  /** the version you're running */
+  current: string;
+}
+
 export interface AppBridge {
   /** an exercise session started / ended: the desktop posture dot pauses meanwhile */
   exercising: (on: boolean) => void;
+  /** app updates (desktop app 1.2.2+) */
+  getUpdate?: () => Promise<UpdateInfo>;
+  checkUpdates?: () => void;
+  installUpdate?: () => void;
+  onUpdate?: (cb: (u: UpdateInfo) => void) => () => void;
 }
 
 export function appBridge(): AppBridge | undefined {
