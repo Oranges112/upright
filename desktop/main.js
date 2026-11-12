@@ -251,8 +251,10 @@ ipcMain.handle("getPos", () => {
 });
 ipcMain.on("moveTo", (_e, x, y) => {
   if (!widget) return;
-  const b = widget.getBounds();
-  widget.setBounds({ x, y, width: b.width, height: b.height });
+  // Always use the fixed dot/pill size. Re-using getBounds() here made the window grow a pixel
+  // on every mouse move on screens with display scaling (e.g. 125%), because of rounding.
+  const size = expanded ? PILL : { w: DOT, h: DOT };
+  widget.setBounds({ x: Math.round(x), y: Math.round(y), width: size.w, height: size.h });
   // keep the dot's position in step with the window
   anchor = expanded ? { x: flip ? x + PILL.w - DOT : x, y: Math.round(y - (DOT - PILL.h) / 2) } : { x, y };
 });
