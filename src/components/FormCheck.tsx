@@ -77,7 +77,7 @@ export function useFormCheck(on: boolean, step: Step | undefined, idx: number, p
           e?.name === "NotAllowedError"
             ? "Camera permission is blocked for this site."
             : e?.name === "NotReadableError"
-              ? /Windows/i.test(navigator.userAgent) && !(window as any).uprightApp
+              ? /Windows|Macintosh/i.test(navigator.userAgent) && !(window as any).uprightApp
                 ? "Camera busy. If the Upright desktop dot is running, right-click it → Open full app, and exercise there."
                 : "Your camera is busy in another app."
               : e?.name === "NotFoundError"

@@ -1,7 +1,7 @@
 {
   "name": "upright-desktop",
   "productName": "Upright",
-  "version": "1.2.2",
+  "version": "1.3.0",
   "description": "Upright posture widget: a tiny always-on-top dot that warns you when you slouch.",
   "author": "Oranges112",
   "license": "MIT",
@@ -9,7 +9,8 @@
   "scripts": {
     "start": "electron .",
     "dev": "set UPRIGHT_URL=http://localhost:3000/&& electron .",
-    "dist": "electron-builder --win portable nsis"
+    "dist": "electron-builder --win portable nsis",
+    "dist:mac": "electron-builder --mac dmg --universal --publish never"
   },
   "build": {
     "appId": "app.upright.desktop",
@@ -22,6 +23,22 @@
     ],
     "win": {
       "icon": "icon.png"
+    },
+    "mac": {
+      "icon": "icon.png",
+      "category": "public.app-category.healthcare-fitness",
+      "target": "dmg",
+      "identity": "-",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "minimumSystemVersion": "12.0",
+      "extendInfo": {
+        "NSCameraUsageDescription": "Upright watches your posture with the camera. Everything stays on your Mac: no video is recorded or uploaded."
+      }
+    },
+    "dmg": {
+      "artifactName": "Upright-Mac.dmg",
+      "title": "Upright"
     },
     "portable": {
       "artifactName": "Upright-Portable.exe"

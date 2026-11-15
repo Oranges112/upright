@@ -42,13 +42,16 @@ Nothing to install or sign up for. Open the link on your phone or computer, and 
 | **🔄 Sync without accounts** | Link your phone and computer with a private code; streaks merge automatically. Photos stay on the device. |
 | **🌙 Dark mode, offline, installable** | A PWA that works offline and installs from the browser. |
 
-## 🪟 Desktop widget (Windows)
+## 🪟 Desktop widget (Windows and Mac)
 
-A tiny see-through dot that sits on top of every app. It's faded green while your posture is good, and pops out red with what's wrong ("Head forward · Slide your chin back") when you slouch. Drag it anywhere; right-click it (or the tray icon) to recalibrate, pause, or open the full app.
+A tiny see-through dot that sits on top of every app. It's faded green while your posture is good, and pops out red with what's wrong ("Head forward · Slide your chin back") when you slouch. Drag it anywhere; right-click it (or the tray / menu-bar icon) to recalibrate, pause, or open the full app.
 
-**[⬇️ Download the Windows installer](https://github.com/Oranges112/upright/releases/latest/download/Upright-Setup.exe)** and open it: it installs in a few seconds and starts the widget. (Prefer no install? Get `Upright-Portable.exe` from [Releases](https://github.com/Oranges112/upright/releases).) You can also download it from the **Guard** tab inside the app. Windows may warn that the app isn't from a known publisher, because it isn't code-signed: click **More info → Run anyway**.
+- **Windows: [⬇️ Upright-Setup.exe](https://github.com/Oranges112/upright/releases/latest/download/Upright-Setup.exe)**. Open it: it installs in a few seconds, starts the widget, and updates itself from then on. (Prefer no install? Get `Upright-Portable.exe` from [Releases](https://github.com/Oranges112/upright/releases).) Windows may warn that the app isn't from a known publisher, because it isn't code-signed: click **More info → Run anyway**.
+- **Mac: [⬇️ Upright-Mac.dmg](https://github.com/Oranges112/upright/releases/latest/download/Upright-Mac.dmg)** (macOS 12+, Intel and Apple Silicon). Drag Upright into Applications and open it. It isn't signed with a paid Apple Developer account, so macOS blocks it the first time: go to **System Settings → Privacy & Security → Open Anyway**, then allow the camera. It tells you when a new version is out (Macs only let signed apps replace themselves).
 
-To build it yourself: `cd desktop && npm install && npm run dist`. To point it at your own copy of Upright (for sync), edit `url` in `%APPDATA%\Upright\config.json`.
+You can also download it from the **Guard** tab inside the app. Either way, the posture checks and screens update by themselves, because the app loads them from the website.
+
+To build it yourself: `cd desktop && npm install && npm run dist` (Windows) or `npm run dist:mac` (on a Mac). Publishing a `desktop-v*` release on GitHub builds the Mac app automatically and attaches it (`.github/workflows/desktop-mac.yml`). To point the app at your own copy of Upright (for sync), edit `url` in `config.json` (`%APPDATA%\Upright` on Windows, `~/Library/Application Support/Upright` on Mac).
 
 ## Host your own copy (about 10 minutes, free tiers)
 

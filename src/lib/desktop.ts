@@ -23,6 +23,9 @@ export interface UpdateInfo {
   pct: number;
   /** the version you're running */
   current: string;
+  /** true on a Mac: an update is a download you install yourself, not a restart (desktop app 1.3+) */
+  manual?: boolean;
+  platform?: "windows" | "mac";
 }
 
 export interface AppBridge {
@@ -45,6 +48,6 @@ export function signalExercising() {
   return () => appBridge()?.exercising(false);
 }
 
-/** Opens the installed Windows app (registered by its installer). */
+/** Opens the installed desktop app (Windows or Mac; registered when it's installed). */
 export const OPEN_DESKTOP_APP = "upright://open";
 export const DESKTOP_KEY = "upright:desktop-installed";

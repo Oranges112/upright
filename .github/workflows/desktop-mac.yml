@@ -1,0 +1,56 @@
+# Builds the Mac desktop app (Upright-Mac.dmg) on a GitHub Mac runner and attaches it to the
+# desktop release. Runs by itself when a desktop-v* release is published; you can also run it
+# by hand (Actions → Mac desktop app → Run workflow) for an existing release tag.
+#
+# The app is ad-hoc signed only (no paid Apple Developer account), so the first time someone opens
+# it macOS asks them to allow it in System Settings → Privacy & Security → Open Anyway.
+name: Mac desktop app
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to build and attach to (e.g. desktop-v1.3.0)"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  mac:
+    if: github.event_name == 'workflow_dispatch' || startsWith(github.event.release.tag_name, 'desktop-v')
+    runs-on: macos-latest
+    env:
+      TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.event.release.tag_name }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+      - name: Install
+        working-directory: desktop
+        run: npm ci
+      - name: Build (Intel + Apple Silicon in one app)
+        working-directory: desktop
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: npm run dist:mac
+      - name: Check the app is signed (ad-hoc) and asks for the camera
+        working-directory: desktop
+        run: |
+          app=$(ls -d dist/mac-universal/*.app | head -1)
+          codesign --verify --deep --verbose=2 "$app"
+          /usr/libexec/PlistBuddy -c "Print :NSCameraUsageDescription" "$app/Contents/Info.plist"
+          lipo -archs "$app/Contents/MacOS/Upright"
+          ls -la dist/*.dmg
+      - name: Attach to the release
+        working-directory: desktop
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$TAG" dist/Upright-Mac.dmg --clobber --repo "$GITHUB_REPOSITORY"

@@ -3,9 +3,14 @@
  * A tiny frameless, see-through, always-on-top posture dot. It loads the Upright
  * web app's /widget page, which runs Posture Guard on your webcam (all on-device).
  */
-const { app, BrowserWindow, Menu, Notification, Tray, ipcMain, screen, session, shell, nativeImage } = require("electron");
+const { app, BrowserWindow, Menu, Notification, Tray, ipcMain, net, screen, session, shell, nativeImage, systemPreferences } = require("electron");
 const path = require("path");
 const fs = require("fs");
+
+const MAC = process.platform === "darwin";
+/** where Mac users download new versions (unsigned Mac apps can't update themselves) */
+const MAC_DOWNLOAD = "https://github.com/Oranges112/upright/releases/latest/download/Upright-Mac.dmg";
+const LATEST_RELEASE_API = "https://api.github.com/repos/Oranges112/upright/releases/latest";
 
 // Development: UPRIGHT_PROFILE=some-folder runs a separate copy (own settings, own single-instance lock).
 if (process.env.UPRIGHT_PROFILE) app.setPath("userData", path.resolve(process.env.UPRIGHT_PROFILE));
@@ -17,7 +22,7 @@ const DEFAULT_URL = "https://oranges112.github.io/upright/";
 const DOT = 50; // px, the see-through dot
 const PILL = { w: 268, h: 58 }; // px, when it pops out
 
-/* ---------- settings (saved in %APPDATA%/Upright/config.json) ---------- */
+/* ---------- settings (%APPDATA%/Upright/config.json on Windows, ~/Library/Application Support/Upright on Mac) ---------- */
 const cfgFile = () => path.join(app.getPath("userData"), "config.json");
 function loadCfg() {
   try {
@@ -101,7 +106,8 @@ function createWidget() {
     },
   });
   widget.setAlwaysOnTop(true, "screen-saver");
-  widget.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
+  // (skipTransformProcessType: on a Mac, don't let this hide the dock icon behind our back)
+  widget.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
   widget.loadURL(`${appUrl()}widget`);
   widget.once("ready-to-show", () => widget.showInactive());
   widget.webContents.setWindowOpenHandler(({ url }) => {
@@ -138,6 +144,7 @@ function openFullApp(query = "") {
     appWin.show();
     return appWin.focus();
   }
+  if (MAC) void app.dock?.show();
   appWin = new BrowserWindow({
     ...appWindowBounds(),
     minWidth: 360,
@@ -167,6 +174,7 @@ function openFullApp(query = "") {
   appWin.on("closed", () => {
     appWin = null;
     setExercising(false);
+    if (MAC) app.dock?.hide(); // back to just the dot and the menu-bar icon
   });
 }
 
@@ -209,7 +217,8 @@ function setUpdate(patch) {
   for (const w of [appWin, widget]) if (w && !w.isDestroyed()) w.webContents.send("update", updateInfo());
 }
 function updateInfo() {
-  return { ...update, current: app.getVersion() };
+  // manual: the update is a download you install yourself (Mac), not a restart
+  return { ...update, current: app.getVersion(), manual: MAC, platform: MAC ? "mac" : "windows" };
 }
 function updateLabel() {
   switch (update.state) {
@@ -218,7 +227,7 @@ function updateLabel() {
     case "downloading":
       return `Downloading update… ${update.pct}%`;
     case "ready":
-      return `Restart to update to ${update.version}`;
+      return MAC ? `Download Upright ${update.version}` : `Restart to update to ${update.version}`;
     case "none":
       return `Up to date (${app.getVersion()}) · check again`;
     case "error":
@@ -235,6 +244,7 @@ function notify(title, body, onClick) {
 }
 let manualCheck = false;
 function checkForUpdates(manual = false) {
+  if (MAC) return void checkMacUpdates(manual);
   if (!updater) {
     if (manual) notify("Updates", "Automatic updates only work in the installed app (Upright-Setup.exe).");
     return;
@@ -246,11 +256,56 @@ function checkForUpdates(manual = false) {
   updater.checkForUpdates().catch(() => setUpdate({ state: "error" }));
 }
 function installUpdate() {
+  if (MAC) {
+    if (update.state === "ready") void shell.openExternal(MAC_DOWNLOAD);
+    return;
+  }
   if (update.state !== "ready" || !updater) return;
   setImmediate(() => updater.quitAndInstall(true, true));
 }
+/** "1.10.0" > "1.9.2" */
+function newer(a, b) {
+  const pa = String(a).split(".").map(Number);
+  const pb = String(b).split(".").map(Number);
+  for (let i = 0; i < 3; i++) if ((pa[i] || 0) !== (pb[i] || 0)) return (pa[i] || 0) > (pb[i] || 0);
+  return false;
+}
+
+/**
+ * Mac: Apple only lets signed apps replace themselves, so we look for a newer release and offer
+ * the download. (Posture checks and screens still update by themselves: they load from the website.)
+ */
+async function checkMacUpdates(manual) {
+  if (update.state === "checking") return;
+  manualCheck = manual;
+  setUpdate({ state: "checking" });
+  try {
+    const res = await net.fetch(LATEST_RELEASE_API, { headers: { Accept: "application/vnd.github+json" } });
+    if (!res.ok) throw new Error(String(res.status));
+    const rel = await res.json();
+    const latest = String(rel.tag_name || "").replace(/^desktop-v/, "");
+    const hasMac = (rel.assets || []).some((a) => a.name === "Upright-Mac.dmg");
+    if (latest && hasMac && newer(latest, app.getVersion())) {
+      const firstTime = update.version !== latest;
+      setUpdate({ state: "ready", version: latest });
+      if (firstTime || manual) notify(`Upright ${latest} is available`, "Click to download it, then drag it into Applications to replace this one.", installUpdate);
+    } else {
+      setUpdate({ state: "none" });
+      if (manual) notify("Upright is up to date", `You have the newest version (${app.getVersion()}).`);
+    }
+  } catch {
+    setUpdate({ state: "error" });
+    if (manual) notify("Couldn't check for updates", "Check your internet connection and try again.");
+  }
+}
+
 function setupUpdates() {
   if (!app.isPackaged) return; // a development copy never updates itself
+  if (MAC) {
+    setTimeout(() => checkMacUpdates(false), 15_000);
+    setInterval(() => checkMacUpdates(false), UPDATE_EVERY);
+    return;
+  }
   // testing: UPRIGHT_UPDATE_URL points a test copy at a local update server
   if (process.env.UPRIGHT_PROFILE && !process.env.UPRIGHT_UPDATE_URL) return;
   try {
@@ -291,7 +346,7 @@ function send(cmd) {
 function menu() {
   return Menu.buildFromTemplate([
     { label: `Upright: ${status.label}`, enabled: false },
-    ...(update.state === "ready" ? [{ label: `⬆ Restart to update to ${update.version}`, click: installUpdate }] : []),
+    ...(update.state === "ready" ? [{ label: `⬆ ${updateLabel()}`, click: installUpdate }] : []),
     { type: "separator" },
     { label: "Recalibrate (sit tall first)", click: () => send("calibrate") },
     { label: "Test a nudge", click: () => send("test") },
@@ -310,7 +365,7 @@ function menu() {
       click: () => (widget && widget.isVisible() ? widget.hide() : widget && widget.showInactive()),
     },
     {
-      label: "Start with Windows",
+      label: MAC ? "Open at login" : "Start with Windows",
       type: "checkbox",
       checked: app.getLoginItemSettings().openAtLogin,
       click: (item) => app.setLoginItemSettings({ openAtLogin: item.checked }),
@@ -374,7 +429,23 @@ if (!app.requestSingleInstanceLock()) {
   });
   // register upright:// links (the installer also does this); skip in development so we don't point Windows at a dev build
   if (app.isPackaged && !process.env.UPRIGHT_PROFILE) app.setAsDefaultProtocolClient(PROTOCOL);
-  app.whenReady().then(() => {
+  // Mac: links arrive as an event (including the one that launched us), and opening the app again
+  // (Finder, Launchpad, Spotlight) "activates" the running copy instead of starting a second one
+  let pendingLink = null;
+  let started = false;
+  app.on("open-url", (e, url) => {
+    e.preventDefault();
+    if (started && widget) handleLink(url);
+    else pendingLink = url;
+  });
+  app.on("activate", () => {
+    if (!started) return;
+    if (widget) widget.showInactive();
+    openFullApp();
+  });
+  // Mac: a menu-bar app; the dock icon only shows while the full app window is open
+  if (MAC) app.dock?.hide();
+  app.whenReady().then(async () => {
     cfg = loadCfg();
     if (!cfg.url) {
       cfg.url = DEFAULT_URL;
@@ -385,14 +456,21 @@ if (!app.requestSingleInstanceLock()) {
     const ok = (wc, perm) => ["media", "notifications"].includes(perm) && wc && wc.getURL().startsWith(allowed);
     session.defaultSession.setPermissionRequestHandler((wc, perm, cb) => cb(ok(wc, perm)));
     session.defaultSession.setPermissionCheckHandler((wc, perm) => ok(wc, perm));
-    app.setAppUserModelId("app.upright.desktop");
+    if (!MAC) app.setAppUserModelId("app.upright.desktop");
+    // Mac asks once whether Upright may use the camera (the dot needs it for Posture Guard)
+    if (MAC && systemPreferences.getMediaAccessStatus("camera") === "not-determined") {
+      try {
+        await systemPreferences.askForMediaAccess("camera");
+      } catch {}
+    }
 
     createWidget();
     createTray();
     setupUpdates();
     // launched by a link (e.g. "Open Upright" on the website)
-    const first = linkFrom(process.argv);
+    const first = linkFrom(process.argv) || pendingLink;
     if (first) widget.once("ready-to-show", () => handleLink(first));
+    started = true;
     screen.on("display-removed", () => {
       const wa = workAreaFor(anchor);
       anchor = { x: Math.min(anchor.x, wa.x + wa.width - DOT), y: Math.min(anchor.y, wa.y + wa.height - DOT) };
