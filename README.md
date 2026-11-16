@@ -1,6 +1,6 @@
 # Upright 🧘‍♂️ fix tech neck, one 2-minute break at a time
 
-A free, open-source posture coach that runs in your browser and installs like an app on your phone and computer.
+A free posture coach that runs in your browser and installs like an app on your phone and computer. The code is public and free for non-commercial use ([license](#license)).
 
 - It **reminds you** to take neck breaks as often as you choose.
 - It **does the exercises with you**, with an animated coach, countdowns, chimes and an optional voice.
@@ -58,7 +58,7 @@ To build it yourself: `cd desktop && npm install && npm run dist` (Windows) or `
 You need a free GitHub account and a free [Vercel](https://vercel.com) account.
 
 ### 1. Copy the code
-Click **Fork** at the top of this page (or download the ZIP and push it to your own repo).
+Click **Fork** at the top of this page (or download the ZIP and push it to your own repo). Your own copy is fine for personal and other non-commercial use; see [License](#license).
 
 ### 2. Import it into Vercel
 vercel.com → **Add New → Project** → pick your fork → **Deploy**. That's enough for a working app: without the steps below, everything works but data stays on each device and reminders only fire while the app is open.
@@ -136,7 +136,7 @@ Built with Next.js, React, TypeScript, MediaPipe Tasks Vision, Upstash and Web P
 
 ## Contributing
 
-Ideas, bug reports and pull requests are welcome. Good first ideas: new exercises, translations, a custom routine builder.
+Ideas, bug reports and pull requests are welcome. Good first ideas: new exercises, translations, a custom routine builder. By sending a pull request you agree that your contribution can be used in Upright under the same license.
 
 ## Disclaimer
 
@@ -144,4 +144,10 @@ Upright is a habit tool, not medical advice. If you have sharp pain, numbness, t
 
 ## License
 
-[MIT](LICENSE). Use it, change it, share it.
+[PolyForm Noncommercial 1.0.0](LICENSE). In short:
+
+- ✅ **Free to use, change and share** for personal and other non-commercial purposes, including hosting your own copy for yourself, and use by charities, schools and health organisations.
+- ❌ **No commercial use.** You can't sell it, charge for it, or use it in a paid product or service without written permission. Interested? [Open an issue](https://github.com/Oranges112/upright/issues) to ask.
+- 📝 **Credit required.** Anyone who shares Upright or something built from it must include the [LICENSE](LICENSE) file, with its `Required Notice: Copyright (c) 2026 Oranges112` line.
+
+Versions published before 16 November 2026 were released under the MIT license.
