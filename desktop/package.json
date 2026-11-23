@@ -28,6 +28,7 @@
       "icon": "icon.png",
       "category": "public.app-category.healthcare-fitness",
       "target": ["dmg", "zip"],
+      "artifactName": "Upright-Mac.${ext}",
       "identity": "-",
       "hardenedRuntime": false,
       "gatekeeperAssess": false,
@@ -35,9 +36,6 @@
       "extendInfo": {
         "NSCameraUsageDescription": "Upright watches your posture with the camera. Everything stays on your Mac: no video is recorded or uploaded."
       }
-    },
-    "zip": {
-      "artifactName": "Upright-Mac.zip"
     },
     "dmg": {
       "artifactName": "Upright-Mac.dmg",
