@@ -112,7 +112,11 @@ export default function PhoneLink({ meta, config, flash }: { meta: Meta; config:
               <p className="muted small">Scan with your phone&apos;s camera to open it, then add it to your home screen. Great for gym workouts and reminders on the go.</p>
               <p className="row-hint">
                 Linking phone and computer (so progress is shared) isn&apos;t switched on for this copy yet. Until then, use <b>Export backup</b> / <b>Import backup</b> below to move
-                your progress.
+                your progress. Want linking?{" "}
+                <a href="https://github.com/Oranges112/upright#host-your-own-copy-about-10-minutes-free-tiers" target="_blank" rel="noreferrer">
+                  Here&apos;s how to set it up (free, about 10 min)
+                </a>
+                .
               </p>
             </div>
           </div>
