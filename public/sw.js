@@ -1,5 +1,5 @@
 /* Upright service worker: offline shell + push reminders */
-const CACHE = "upright-v2";
+const CACHE = "upright-v3";
 // "" on Vercel, "/upright" on GitHub Pages: worked out from where this worker lives
 const BASE = new URL(self.registration.scope).pathname.replace(/\/$/, "");
 const SHELL = [`${BASE}/`, `${BASE}/manifest.webmanifest`, `${BASE}/icons/192.png`, `${BASE}/icons/512.png`];
@@ -94,8 +94,8 @@ self.addEventListener("notificationclick", (event) => {
     event.waitUntil(
       (async () => {
         const all = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
-        all.forEach((c) => c.postMessage({ type: "snooze", minutes: 30 }));
-        if (data.code) {
+        all.forEach((c) => c.postMessage({ type: "snooze", kind: data.kind || "break" }));
+        if (data.code && (!data.kind || data.kind === "break")) {
           await fetch(`${BASE}/api/snooze`, {
             method: "POST",
             headers: { "content-type": "application/json" },
@@ -114,7 +114,7 @@ self.addEventListener("notificationclick", (event) => {
       for (const c of all) {
         if (new URL(c.url).origin === self.location.origin) {
           await c.focus();
-          if (target.includes("start=")) c.postMessage({ type: "start" });
+          if (target.includes("start=")) c.postMessage({ type: "start", kind: data.kind || "break" });
           return;
         }
       }

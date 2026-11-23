@@ -85,11 +85,18 @@ export default function MiniWidget({ today, mode = "pip" }: { today: string; mod
     tilt: { x: 0, y: 0, r: -22 * k },
   }[g.status as "forward"] ?? { x: 0, y: 0, r: 0 };
 
-  const title = issue ? issue.what : TITLE[g.status] ?? "";
+  const pausedMin = g.pausedUntil ? Math.max(1, Math.ceil((g.pausedUntil - now) / 60_000)) : 0;
+  const title = issue ? issue.what : g.exercising && running ? "Exercising" : g.status === "off" && (pausedMin || mode === "desktop") ? "Paused" : TITLE[g.status] ?? "";
   const sub = !running
     ? g.status === "error" && g.error?.includes("busy")
       ? "Camera busy in another app · tap to retry"
-      : "Tap to start"
+      : pausedMin
+        ? `Back in ${pausedMin < 60 ? `${pausedMin} min` : fmtMin(pausedMin * 60)} · tap to resume`
+        : mode === "desktop"
+          ? "Tap to resume"
+          : "Tap to start"
+    : g.exercising
+      ? "Back on when you finish"
     : flash && issue
       ? `${issue.fix} 🙆`
       : showStat
@@ -116,7 +123,8 @@ export default function MiniWidget({ today, mode = "pip" }: { today: string; mod
   const desktop = mode === "desktop";
   const [hover, setHover] = useState(false);
   const leaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const needsAttention = bad || flash || !running || g.status === "uncalibrated" || g.status === "moved" || g.status === "calibrating" || g.status === "starting";
+  // (paused: stay a quiet dot; hover to see why)
+  const needsAttention = bad || flash || (!running && !(desktop && g.status === "off")) || g.status === "uncalibrated" || g.status === "moved" || g.status === "calibrating" || g.status === "starting";
   const expanded = !desktop || needsAttention || hover;
   const [flip, setFlip] = useState(false);
 
@@ -128,8 +136,8 @@ export default function MiniWidget({ today, mode = "pip" }: { today: string; mod
   }, [desktop, expanded]);
 
   useEffect(() => {
-    if (desktop) desktopBridge()?.setStatus({ tone, label: issue ? `${issue.what}: ${issue.fix}` : title });
-  }, [desktop, tone, title, issue]);
+    if (desktop) desktopBridge()?.setStatus({ tone, label: issue ? `${issue.what}: ${issue.fix}` : title, paused: g.status === "off" });
+  }, [desktop, tone, title, issue, g.status]);
 
   // desktop: drag the widget anywhere (a click that doesn't move still counts as a click)
   const drag = useRef<{ sx: number; sy: number; x: number; y: number; moved: boolean } | null>(null);
@@ -167,6 +175,8 @@ export default function MiniWidget({ today, mode = "pip" }: { today: string; mod
     if (justDragged.current) return;
     if (!running) void guard.start();
     else if (g.status === "uncalibrated" || g.status === "moved") guard.calibrate();
+    // nothing to fix: the quick menu (quick stretch, neck break, pause, open the app)
+    else if (desktop) desktopBridge()?.quickMenu?.();
   };
 
   // the small dot shows how long you've held good posture, once it's a minute or more
@@ -231,7 +241,7 @@ export default function MiniWidget({ today, mode = "pip" }: { today: string; mod
           e.preventDefault();
           desktopBridge()?.contextMenu();
         }}
-        title={!running ? "Start Posture Guard" : desktop ? "Drag to move · right-click for options" : undefined}
+        title={!running ? "Start Posture Guard" : desktop ? "Click for quick actions · drag to move · right-click for more" : undefined}
       >
         {ringSvg}
         {expanded && (

@@ -2,7 +2,8 @@
 
 import DesktopDownload from "./DesktopDownload";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { Card, Chips } from "./ui";
+import { Card, Chips, Toggle } from "./ui";
+import { openCamera } from "@/lib/face";
 import { BAD, ISSUE, guard, type GuardState, type GuardStatus } from "@/lib/guard";
 import { setMeta, useDoc, useMeta } from "@/lib/store";
 import { useCameraShape } from "./FormCheck";
@@ -47,12 +48,39 @@ export default function GuardView({ today }: { today: string }) {
   const bad = BAD.includes(g.status);
   const delay = meta.guardDelaySec ?? 30;
 
-  useEffect(() => {
-    if (videoRef.current) videoRef.current.srcObject = g.stream;
-  }, [g.stream]);
-
   const running = g.status !== "off" && g.status !== "error";
-  const camShape = useCameraShape(videoRef, g.stream);
+
+  // The guard runs in another window (the desktop dot): show our own camera picture alongside.
+  const [preview, setPreview] = useState<MediaStream | null>(null);
+  useEffect(() => {
+    if (!g.remote || !running) return;
+    let s: MediaStream | null = null;
+    let cancelled = false;
+    openCamera()
+      .then((x) => {
+        if (cancelled) x.getTracks().forEach((t) => t.stop());
+        else setPreview((s = x));
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+      s?.getTracks().forEach((t) => t.stop());
+      setPreview(null);
+    };
+  }, [g.remote, running]);
+  const stream = g.stream ?? preview;
+
+  useEffect(() => {
+    if (videoRef.current) videoRef.current.srcObject = stream;
+  }, [stream]);
+
+  const camShape = useCameraShape(videoRef, stream);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const i = setInterval(() => setNow(Date.now()), 20_000);
+    return () => clearInterval(i);
+  }, []);
+  const pausedMin = g.pausedUntil && g.pausedUntil > now ? Math.ceil((g.pausedUntil - now) / 60_000) : 0;
   const ui = STATUS_UI[g.status];
 
   // today's totals (all devices) + the unsaved bit from this session
@@ -81,7 +109,19 @@ export default function GuardView({ today }: { today: string }) {
       <div className="guard-cols">
       <div className="guard-main">
       <Card className={`guard-hero tone-${ui.tone}`}>
-        {!running ? (
+        {!running && (g.remote || pausedMin > 0) && g.status !== "error" ? (
+          <div className="guard-intro">
+            <div className="guard-icon">⏸️</div>
+            <h2>Posture Guard is paused</h2>
+            <p className="muted">
+              {pausedMin > 0 ? `It turns itself back on in ${pausedMin < 60 ? `${pausedMin} min` : `${Math.floor(pausedMin / 60)}h ${pausedMin % 60}m`}.` : "The camera is off until you turn it back on."}
+              {g.remote && " It runs in the floating dot, so it keeps working when this window is closed."}
+            </p>
+            <button className="btn primary big" onClick={() => void guard.start()}>
+              ▶ Turn it back on
+            </button>
+          </div>
+        ) : !running ? (
           <div className="guard-intro">
             <div className="guard-icon">🛡️</div>
             <h2>Your webcam spots the slouch</h2>
@@ -110,7 +150,7 @@ export default function GuardView({ today }: { today: string }) {
               <video ref={videoRef} autoPlay muted playsInline />
               <div className={`cam-status tone-${ui.tone}`}>
                 <i />
-                {g.status === "calibrating" ? `Calibrating… ${Math.ceil(g.calibrateLeft)}` : ui.label}
+                {g.exercising ? "Paused while you exercise" : g.status === "calibrating" ? `Calibrating… ${Math.ceil(g.calibrateLeft)}` : ui.label}
                 {g.turned && <small className="cam-count">· 👀 turned, still checking</small>}
                 {bad && <small className="cam-count">· chime in {Math.max(0, Math.ceil(delay - g.badFor))}s</small>}
               </div>
@@ -128,12 +168,17 @@ export default function GuardView({ today }: { today: string }) {
               <button className="btn primary" onClick={() => guard.calibrate()} disabled={g.status === "calibrating" || g.status === "starting"}>
                 {meta.guardBase ? "Recalibrate" : "Calibrate (sit tall)"}
               </button>
+              <button className="btn ghost" onClick={() => guard.pause(60)}>
+                Pause 1 hour
+              </button>
               <button className="btn ghost" onClick={() => guard.stop()}>
-                Stop
+                {g.remote ? "Pause" : "Stop"}
               </button>
             </div>
+            {g.remote && <p className="tiny muted center-text">🟢 Running in the floating dot, so it keeps going when this window is closed.</p>}
             <div className="guard-pop">
               {canPop &&
+                !g.remote &&
                 (widgetWin ? (
                   <button className="btn ghost" onClick={closeWidget}>
                     Close floating widget
@@ -247,6 +292,8 @@ export default function GuardView({ today }: { today: string }) {
             format={(v) => (v < 60 ? `${v}s` : `${v / 60} min`)}
           />
         </div>
+        <Toggle label="Chime on a nudge" on={meta.guardChime !== false} onChange={(v) => setMeta({ guardChime: v })} />
+        <Toggle label="Pop-up notification on a nudge" hint="Shows even when you're in another app." on={meta.guardPopup !== false} onChange={(v) => setMeta({ guardPopup: v })} />
         <div className="field-block">
           <span className="row-label">Start the &ldquo;Holding for&rdquo; count over after slouching for</span>
           <Chips

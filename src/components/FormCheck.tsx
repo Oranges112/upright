@@ -55,7 +55,7 @@ export function useFormCheck(on: boolean, step: Step | undefined, idx: number, p
     setCam("starting");
     (async () => {
       try {
-        const shared = guard.state.stream;
+        const shared = guard.engine.state.stream;
         const stream =
           shared && shared.active
             ? shared

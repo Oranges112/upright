@@ -20,7 +20,8 @@
 import { addGuardTime, getMeta, setMeta, type GuardBase } from "./store";
 import { sound } from "./sound";
 import { detectFace, getFaceDetector, measureFace, median, openCamera, type Sample } from "./face";
-import { asset } from "./base";
+import { notify } from "./notify";
+import { onBus, pageId, post } from "./bus";
 
 export type GuardStatus =
   | "off"
@@ -64,6 +65,12 @@ export interface GuardState {
   maybeMoved: boolean;
   /** when the last nudge fired (widget flashes) */
   nudgedAt: number;
+  /** paused until this time (ms), from "Pause for 1 hour"; 0 = not paused by time */
+  pausedUntil?: number;
+  /** paused while you do an exercise session */
+  exercising?: boolean;
+  /** this is what another window (e.g. the desktop dot) sees, not this window's own camera */
+  remote?: boolean;
 }
 
 /**
@@ -214,7 +221,7 @@ function workerInterval(fn: () => void, ms: number): () => void {
   }
 }
 
-class Guard {
+class GuardEngine {
   state: GuardState = this.fresh();
   private listeners = new Set<() => void>();
   private detector: any = null;
@@ -250,7 +257,12 @@ class Guard {
     return this.state.status !== "off" && this.state.status !== "error";
   }
 
+  private resumeTimer: ReturnType<typeof setTimeout> | null = null;
+
   async start() {
+    if (this.resumeTimer) clearTimeout(this.resumeTimer);
+    this.resumeTimer = null;
+    if (getMeta().guardPausedUntil) setMeta({ guardPausedUntil: undefined });
     if (this.running) return;
     this.set({ ...this.fresh(), status: "starting" });
     try {
@@ -301,6 +313,19 @@ class Guard {
     this.set({ ...this.fresh(), status: "off" });
   }
 
+  /** Pause for a while (minutes), or until you start it again (no minutes). Turns the camera off. */
+  pause(minutes?: number) {
+    this.stop();
+    if (this.resumeTimer) clearTimeout(this.resumeTimer);
+    this.resumeTimer = null;
+    if (minutes && minutes > 0) {
+      const until = Date.now() + minutes * 60_000;
+      setMeta({ guardPausedUntil: until });
+      this.set({ pausedUntil: until });
+      this.resumeTimer = setTimeout(() => void this.start(), minutes * 60_000);
+    }
+  }
+
   /** Sit tall, facing your main screen, then call this: 3 seconds of measurements become your "good" posture. */
   calibrate() {
     if (!this.running) return;
@@ -343,7 +368,9 @@ class Guard {
   private paused = false;
   /** Paused during exercise sessions (neck movements would look like slouching). */
   setPaused(p: boolean) {
+    if (this.paused === p) return;
     this.paused = p;
+    this.set({ exercising: p });
   }
 
   private tick() {
@@ -454,25 +481,19 @@ class Guard {
   /** Fire a sample nudge so you can hear / see what it looks like. */
   testNudge() {
     sound.unlock();
-    void this.nudge("forward");
+    void this.nudge("forward", true);
   }
 
-  private async nudge(status: GuardStatus) {
-    sound.posture();
+  private async nudge(status: GuardStatus, test = false) {
+    const m = getMeta();
+    if (m.guardChime !== false || test) sound.posture();
     this.set({ nudgedAt: Date.now() });
     try {
       navigator.vibrate?.([60, 40, 60]);
     } catch {}
     const [title, body] = NUDGES[Math.floor(Math.random() * NUDGES.length)];
     const text = ISSUE[status]?.notify ?? body;
-    try {
-      if ("Notification" in window && Notification.permission === "granted") {
-        const reg = await navigator.serviceWorker?.getRegistration();
-        const opts = { body: text, icon: asset("/icons/192.png"), badge: asset("/icons/96.png"), tag: "upright-guard", renotify: true, silent: false } as NotificationOptions;
-        if (reg) await reg.showNotification(title, opts);
-        else new Notification(title, opts);
-      }
-    } catch {}
+    if (m.guardPopup !== false || test) await notify({ title, body: text, kind: "guard" });
   }
 
   private flush(force = false) {
@@ -484,4 +505,167 @@ class Guard {
   }
 }
 
-export const guard = new Guard();
+/* ---------------- one Posture Guard for every window ---------------- */
+
+/** What other windows need to know (no camera stream: that can't be shared). */
+function shareable(s: GuardState) {
+  return { ...s, stream: null };
+}
+
+/** How long without news from the window running the guard before we stop trusting it. */
+const STALE_MS = 3500;
+
+/**
+ * The guard every screen uses. Only ONE window on this computer runs the camera:
+ *  - the desktop app's floating dot, if it's running (it always owns the guard)
+ *  - otherwise whichever browser tab started it
+ * The other windows show the same live state, and their buttons control that window's guard,
+ * so the dot and the app window can never disagree (or fight over the camera).
+ */
+class GuardHub {
+  readonly engine = new GuardEngine();
+  private host: "widget" | "page" = "page";
+  private remote: { from: string; host: "widget" | "page"; state: GuardState; at: number } | null = null;
+  private view: GuardState = this.engine.state;
+  private listeners = new Set<() => void>();
+  private lastPost = 0;
+  private postTimer: ReturnType<typeof setTimeout> | null = null;
+  private started = false;
+
+  private init() {
+    if (this.started || typeof window === "undefined") return;
+    this.started = true;
+    this.engine.subscribe(() => {
+      this.update();
+      this.share();
+    });
+    onBus((m) => {
+      if (m.t === "guard:state") {
+        this.remote = { from: m.from, host: m.host, state: { ...(m.state as GuardState), remote: true }, at: Date.now() };
+        // the desktop dot always runs the guard: a browser tab running its own copy hands over
+        if (m.host === "widget" && this.host === "page" && this.engine.running) this.engine.stop();
+        this.update();
+      } else if (m.t === "guard:hello") {
+        if (this.owns()) this.share(true);
+      } else if (m.t === "guard:cmd" && (m.to === pageId || (m.to === "owner" && this.owns()))) {
+        this.run(m.cmd, m.arg);
+      }
+    });
+    // keep telling the others we're here, and notice when the window running the guard goes away
+    setInterval(() => {
+      if (this.owns()) this.share(true);
+      if (this.remote && Date.now() - this.remote.at > STALE_MS) {
+        this.remote = null;
+        this.update();
+      }
+    }, 1000);
+    post({ t: "guard:hello" });
+  }
+
+  /** this window runs the guard (or is the desktop dot, which always does) */
+  private owns() {
+    return this.host === "widget" || this.engine.running;
+  }
+
+  /** the guard lives in another window right now */
+  private useRemote() {
+    if (this.host === "widget" || this.engine.running) return false;
+    const r = this.remote;
+    if (!r || Date.now() - r.at > STALE_MS) return false;
+    return r.host === "widget" || (r.state.status !== "off" && r.state.status !== "error");
+  }
+
+  private update() {
+    const next = this.useRemote() ? this.remote!.state : this.engine.state;
+    if (next !== this.view) {
+      this.view = next;
+      this.listeners.forEach((l) => l());
+    }
+  }
+
+  private share(force = false) {
+    if (!this.owns()) return;
+    const send = () => {
+      if (this.postTimer) clearTimeout(this.postTimer);
+      this.postTimer = null;
+      this.lastPost = Date.now();
+      post({ t: "guard:state", host: this.host, state: shareable(this.engine.state) });
+    };
+    // at most ~5 updates a second
+    if (force || Date.now() - this.lastPost > 200) send();
+    else if (!this.postTimer) this.postTimer = setTimeout(send, 200);
+  }
+
+  private run(cmd: string, arg?: number | boolean) {
+    const e = this.engine;
+    if (cmd === "start" || cmd === "resume") void e.start();
+    else if (cmd === "stop") e.pause();
+    else if (cmd === "pause") e.pause(typeof arg === "number" ? arg : undefined);
+    else if (cmd === "calibrate") e.calibrate();
+    else if (cmd === "test") e.testNudge();
+    else if (cmd === "exercise") e.setPaused(!!arg);
+  }
+
+  private send(cmd: string, arg?: number | boolean) {
+    if (this.useRemote()) post({ t: "guard:cmd", to: this.remote!.from, cmd, arg });
+    else this.run(cmd, arg);
+  }
+
+  /** Called first thing in the desktop dot: it always runs the guard. */
+  setHost(h: "widget" | "page") {
+    this.host = h;
+    this.init();
+  }
+
+  subscribe = (l: () => void) => {
+    this.init();
+    this.listeners.add(l);
+    return () => {
+      this.listeners.delete(l);
+    };
+  };
+  getState = () => {
+    this.init();
+    return this.view;
+  };
+  get running() {
+    const s = this.getState().status;
+    return s !== "off" && s !== "error";
+  }
+  /** true when the camera lives in another window */
+  get isRemote() {
+    return this.useRemote();
+  }
+  get delaySec() {
+    return this.engine.delaySec;
+  }
+  start() {
+    this.init();
+    this.send("start");
+    return Promise.resolve();
+  }
+  /** Turn it off (until you start it again). */
+  stop() {
+    this.send("stop");
+  }
+  /** Pause for some minutes (or until started again). */
+  pause(minutes?: number) {
+    this.send("pause", minutes);
+  }
+  calibrate() {
+    this.send("calibrate");
+  }
+  testNudge() {
+    sound.unlock();
+    this.send("test");
+  }
+  /** Paused during exercise sessions (neck movements would look like slouching), in whichever window runs it. */
+  setPaused(p: boolean) {
+    this.init();
+    this.engine.setPaused(p);
+    if (this.useRemote()) post({ t: "guard:cmd", to: "owner", cmd: "exercise", arg: p });
+  }
+}
+
+export const guard = new GuardHub();
+

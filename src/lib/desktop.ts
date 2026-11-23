@@ -7,8 +7,27 @@ export interface DesktopBridge {
   dragEnd: () => void;
   /** menu clicks from the tray / right-click menu: calibrate, pause, resume, test (older versions also send calibrate2) */
   onCommand: (cb: (cmd: string) => void) => void;
-  setStatus: (status: { tone: string; label: string }) => void;
+  setStatus: (status: { tone: string; label: string; paused?: boolean }) => void;
   contextMenu: () => void;
+  /** desktop app 1.4+: native notifications, how long the computer has been idle, settings */
+  notify?: (n: DesktopNotice) => void;
+  idle?: () => Promise<{ sec: number; locked: boolean }>;
+  /** the quick menu (left click on the dot) */
+  quickMenu?: () => void;
+}
+
+export interface DesktopNotice {
+  title: string;
+  body: string;
+  kind: string;
+  /** upright:// link opened when it's clicked */
+  link: string;
+}
+
+/** Desktop-app settings shown in Settings (desktop app 1.4+). */
+export interface DesktopPrefs {
+  openAtLogin: boolean;
+  showDot: boolean;
 }
 
 export function desktopBridge(): DesktopBridge | undefined {
@@ -36,6 +55,11 @@ export interface AppBridge {
   checkUpdates?: () => void;
   installUpdate?: () => void;
   onUpdate?: (cb: (u: UpdateInfo) => void) => () => void;
+  /** desktop app 1.4+ */
+  notify?: (n: DesktopNotice) => void;
+  idle?: () => Promise<{ sec: number; locked: boolean }>;
+  getPrefs?: () => Promise<DesktopPrefs>;
+  setPrefs?: (p: Partial<DesktopPrefs>) => void;
 }
 
 export function appBridge(): AppBridge | undefined {

@@ -31,6 +31,8 @@ export interface Phase {
   label: string;
   sec: number;
   pose: Pose;
+  /** full-body pose (exercises with `body`), see gymAnim.ts */
+  body?: import("./gymAnim").SidePose;
 }
 
 export interface Exercise {
@@ -49,7 +51,16 @@ export interface Exercise {
   /** can be done at a desk without anyone noticing */
   discreet: boolean;
   targets: string;
+  /** body areas this helps (see AREAS in exercises.ts) */
+  areas?: Area[];
+  /** drawn with the full-body figure instead of the head-and-shoulders one */
+  body?: { scene: string };
+  /** a gentler swap for "This hurts" */
+  easier?: string;
 }
+
+/** Body areas you can pick in setup. Exercises and routines are filtered by these. */
+export type Area = "neck" | "upper-back" | "lower-back" | "hips" | "legs";
 
 export interface Routine {
   id: string;
@@ -57,6 +68,10 @@ export interface Routine {
   blurb: string;
   emoji: string;
   exercises: string[];
+  /** body areas this routine is for */
+  areas?: Area[];
+  /** done standing up (the quick stretch) */
+  standing?: boolean;
   /** overrides for reps per exercise */
   reps?: Record<string, number>;
   /** overrides for "Hold" phase length per exercise */
@@ -80,6 +95,8 @@ export interface CheckIn {
   day: string;
   /** neck stiffness / discomfort 0 (none) - 10 (worst) */
   stiffness: number;
+  /** which area this is about (older check-ins: the neck) */
+  area?: Area;
 }
 
 /** endurance: seconds held · wall: cm gap · angle: forward-head angle in degrees from photo (lower = better) */
@@ -92,6 +109,10 @@ export interface GuardDay {
   goodSec: number;
   totalSec: number;
   nudges: number;
+  /** time at the desk (Posture Guard sees you, or the computer is in use), seconds */
+  sitSec?: number;
+  /** longest stretch sitting without a break, seconds */
+  longestSitSec?: number;
   updatedAt: number;
 }
 
@@ -119,6 +140,35 @@ export interface Settings {
   level: 1 | 2 | 3 | 4;
   theme: "system" | "light" | "dark";
   tz: string;
+  /* ---- quick stretch: stand up and move ---- */
+  stretchOn: boolean;
+  stretchMin: number;
+  /* ---- 20-20-20 eye breaks ---- */
+  eyeOn: boolean;
+  eyeMin: number;
+  /* ---- standing desk: switch between sitting and standing ---- */
+  standDeskOn: boolean;
+  standDeskMin: number;
+  /** a chime with reminders */
+  reminderSound: boolean;
+  /** how long "Snooze" lasts, minutes */
+  snoozeMin: number;
+  /** being away from the desk this long counts as a break (0 = off) */
+  awayBreakMin: number;
+  /** count sitting time */
+  sitTrackOn: boolean;
+  /** what bothers you; empty = everything */
+  areas: Area[];
+  /** show exercises for every area, not just yours */
+  showAll: boolean;
+  /** ask how each area feels */
+  painCheckOn: boolean;
+  /** ask at most every N days (0 = after every session) */
+  painCheckDays: number;
+  /** Monday "your week" card */
+  weeklyOn: boolean;
+  /** exercises you said hurt: never offered again (swapped for the easier one) */
+  skip: string[];
   updatedAt: number;
 }
 

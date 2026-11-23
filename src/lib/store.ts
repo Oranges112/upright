@@ -1,7 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import type { CheckIn, Doc, GuardDay, PostureTest, SessionLog, Settings, TestType } from "./types";
+import type { Area, CheckIn, Doc, GuardDay, PostureTest, SessionLog, Settings, TestType } from "./types";
 import { emptyDoc, mergeDocs, normalize } from "./merge";
 import { dayKey } from "./schedule";
 import { STATIC } from "./base";
@@ -39,6 +39,27 @@ export interface Meta {
   guardDelaySec?: number;
   /** seconds of slouching in a row before "Holding for..." starts over (unset = just after the nudge) */
   holdResetSec?: number;
+  /** Posture Guard: chime / pop-up on a nudge (default on) */
+  guardChime?: boolean;
+  guardPopup?: boolean;
+  /** Posture Guard paused until (ms); 0 / unset = not paused by time */
+  guardPausedUntil?: number;
+  /* ---- the other reminders (see reminders.ts) ---- */
+  lastStretchAt?: number;
+  lastStretchReminderAt?: number;
+  stretchSnoozeUntil?: number;
+  lastEyeAt?: number;
+  eyeSnoozeUntil?: number;
+  lastStandSwitchAt?: number;
+  standing?: boolean;
+  /** last time you were away from the desk long enough to count as a break */
+  lastAwayBreakAt?: number;
+  /** when setup was finished */
+  setupDone?: boolean;
+  /** last pain check (ms) */
+  lastPainCheckAt?: number;
+  /** last weekly summary dismissed (week key) */
+  weeklySeen?: string;
 }
 
 export interface ServerConfig {
@@ -81,6 +102,7 @@ function write(key: string, value: unknown) {
 
 export function getDoc(): Doc {
   if (typeof window === "undefined") return SERVER_DOC;
+  listenAcrossWindows();
   if (!doc) {
     doc = normalize(read<Doc>(KEY));
     if (!doc.settings.updatedAt) {
@@ -94,7 +116,49 @@ export function getDoc(): Doc {
 export function getMeta(): Meta {
   if (typeof window === "undefined") return SERVER_META;
   if (!meta) meta = read<Meta>(META_KEY) ?? {};
+  listenAcrossWindows();
   return meta;
+}
+
+/**
+ * Upright can be open in several windows at once (the desktop dot + the app window, or two
+ * browser tabs). They share one saved copy, so every change is read back in from the others,
+ * and every save merges with what's saved first (so one window never wipes out another's minutes).
+ */
+let listening = false;
+function listenAcrossWindows() {
+  if (listening || typeof window === "undefined") return;
+  listening = true;
+  window.addEventListener("storage", (e) => {
+    if (e.key === KEY) {
+      const incoming = e.newValue ? normalize(JSON.parse(e.newValue) as Doc) : null;
+      if (!incoming) return;
+      const merged = mergeDocs(doc, incoming);
+      if (JSON.stringify(merged) !== JSON.stringify(doc)) {
+        doc = merged;
+        emit();
+      }
+    } else if (e.key === META_KEY) {
+      meta = e.newValue ? (JSON.parse(e.newValue) as Meta) : {};
+      emit();
+    } else if (e.key === null) {
+      // storage cleared (reset)
+      doc = null;
+      meta = null;
+      emit();
+    }
+  });
+}
+
+/** The newest copy: ours merged with whatever another window saved since. Use before changing data. */
+function latestDoc(): Doc {
+  const mine = getDoc();
+  const stored = read<Doc>(KEY);
+  if (!stored) return mine;
+  const merged = mergeDocs(mine, normalize(stored));
+  // keep the same object when nothing changed (React compares by identity)
+  if (JSON.stringify(merged) !== JSON.stringify(mine)) doc = merged;
+  return doc!;
 }
 
 export function useDoc(): Doc {
@@ -125,7 +189,8 @@ function setDoc(next: Doc, opts: { sync?: boolean } = {}) {
 }
 
 export function setMeta(patch: Partial<Meta>) {
-  meta = { ...getMeta(), ...patch };
+  // start from what's saved, in case another window changed something since
+  meta = { ...getMeta(), ...(read<Meta>(META_KEY) ?? {}), ...patch };
   write(META_KEY, meta);
   emit();
 }
@@ -138,7 +203,7 @@ const uid = () =>
 /* ---------------- actions ---------------- */
 
 export function logSession(routineId: string, startedAt: number, durationSec: number, completed: boolean): SessionLog {
-  const d = getDoc();
+  const d = latestDoc();
   const s: SessionLog = {
     id: uid(),
     routineId,
@@ -152,15 +217,15 @@ export function logSession(routineId: string, startedAt: number, durationSec: nu
   return s;
 }
 
-export function addCheckin(stiffness: number) {
-  const d = getDoc();
+export function addCheckin(stiffness: number, area?: Area) {
+  const d = latestDoc();
   const now = Date.now();
-  const c: CheckIn = { id: uid(), at: now, day: dayKey(now, d.settings.tz), stiffness };
+  const c: CheckIn = { id: uid(), at: now, day: dayKey(now, d.settings.tz), stiffness, ...(area && area !== "neck" ? { area } : {}) };
   setDoc({ ...d, checkins: [...d.checkins, c] });
 }
 
 export function addTest(type: TestType, value: number): PostureTest {
-  const d = getDoc();
+  const d = latestDoc();
   const now = Date.now();
   const t: PostureTest = { id: uid(), at: now, day: dayKey(now, d.settings.tz), type, value };
   setDoc({ ...d, tests: [...d.tests, t] });
@@ -179,7 +244,7 @@ export function deviceId(): string {
 /** Add Posture Guard time to today's record for this device. */
 export function addGuardTime(goodSec: number, totalSec: number, nudges: number) {
   if (totalSec <= 0 && nudges <= 0) return;
-  const d = getDoc();
+  const d = latestDoc();
   const day = dayKey(Date.now(), d.settings.tz);
   const id = `${day}:${deviceId()}`;
   const cur = d.guard.find((g) => g.id === id);
@@ -189,13 +254,34 @@ export function addGuardTime(goodSec: number, totalSec: number, nudges: number) 
     goodSec: Math.round((cur?.goodSec ?? 0) + goodSec),
     totalSec: Math.round((cur?.totalSec ?? 0) + totalSec),
     nudges: (cur?.nudges ?? 0) + nudges,
+    ...(cur?.sitSec != null ? { sitSec: cur.sitSec, longestSitSec: cur.longestSitSec } : {}),
+    updatedAt: Date.now(),
+  };
+  setDoc({ ...d, guard: [...d.guard.filter((g) => g.id !== id), next] });
+}
+
+/** Add time spent at the desk today (this device), and the longest unbroken sit so far. */
+export function addSitTime(sec: number, streakSec: number) {
+  if (sec <= 0) return;
+  const d = latestDoc();
+  const day = dayKey(Date.now(), d.settings.tz);
+  const id = `${day}:${deviceId()}`;
+  const cur = d.guard.find((g) => g.id === id);
+  const next: GuardDay = {
+    id,
+    day,
+    goodSec: cur?.goodSec ?? 0,
+    totalSec: cur?.totalSec ?? 0,
+    nudges: cur?.nudges ?? 0,
+    sitSec: Math.round((cur?.sitSec ?? 0) + sec),
+    longestSitSec: Math.round(Math.max(cur?.longestSitSec ?? 0, streakSec)),
     updatedAt: Date.now(),
   };
   setDoc({ ...d, guard: [...d.guard.filter((g) => g.id !== id), next] });
 }
 
 export function updateSettings(patch: Partial<Settings>) {
-  const d = getDoc();
+  const d = latestDoc();
   setDoc({ ...d, settings: { ...d.settings, ...patch, updatedAt: Date.now() } });
 }
 

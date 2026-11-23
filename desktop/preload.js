@@ -9,4 +9,8 @@ contextBridge.exposeInMainWorld("uprightDesktop", {
   onCommand: (cb) => ipcRenderer.on("cmd", (_e, cmd) => cb(cmd)),
   setStatus: (s) => ipcRenderer.send("status", s),
   contextMenu: () => ipcRenderer.send("contextMenu"),
+  // 1.4+
+  quickMenu: () => ipcRenderer.send("quickMenu"),
+  notify: (n) => ipcRenderer.send("notify", n),
+  idle: () => ipcRenderer.invoke("idle"),
 });

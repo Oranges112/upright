@@ -3,7 +3,7 @@
  * A tiny frameless, see-through, always-on-top posture dot. It loads the Upright
  * web app's /widget page, which runs Posture Guard on your webcam (all on-device).
  */
-const { app, BrowserWindow, Menu, Notification, Tray, ipcMain, net, screen, session, shell, nativeImage, systemPreferences } = require("electron");
+const { app, BrowserWindow, Menu, Notification, Tray, ipcMain, net, powerMonitor, screen, session, shell, nativeImage, systemPreferences } = require("electron");
 const path = require("path");
 const fs = require("fs");
 
@@ -50,6 +50,7 @@ let appWin = null;
 let tray = null;
 let expanded = false;
 let flip = false;
+/** Posture Guard is paused (reported by the dot) */
 let paused = false;
 let status = { tone: "idle", label: "Starting…" };
 /** top-left corner of the dot; the pill grows out from here */
@@ -109,7 +110,9 @@ function createWidget() {
   // (skipTransformProcessType: on a Mac, don't let this hide the dock icon behind our back)
   widget.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true });
   widget.loadURL(`${appUrl()}widget`);
-  widget.once("ready-to-show", () => widget.showInactive());
+  widget.once("ready-to-show", () => {
+    if (!cfg.hideDot) widget.showInactive();
+  });
   widget.webContents.setWindowOpenHandler(({ url }) => {
     void shell.openExternal(url);
     return { action: "deny" };
@@ -184,7 +187,8 @@ let exercising = false;
 function setExercising(on) {
   if (exercising === on) return;
   exercising = on;
-  if (!paused) send(on ? "pause" : "resume");
+  // the dot keeps its camera on and just stops judging (the app window also tells it directly)
+  send(on ? "exercise-on" : "exercise-off");
   if (on) status = { tone: "idle", label: "Paused while you exercise" };
   if (tray) tray.setToolTip(`Upright: ${on ? "Paused while you exercise" : status.label}`);
 }
@@ -195,7 +199,7 @@ function handleLink(url) {
   if (!url || !url.startsWith(`${PROTOCOL}://`)) return false;
   const parts = url.slice(PROTOCOL.length + 3).replace(/\/+$/, "").split("/").filter(Boolean);
   const [action, arg] = parts;
-  if (widget && !widget.isVisible()) widget.showInactive();
+  if (widget && !widget.isVisible() && !cfg.hideDot) widget.showInactive();
   if (action === "start") openFullApp(`?start=${encodeURIComponent(arg || "default")}`);
   else if (action === "widget") {
     /* just make sure the dot is showing */
@@ -343,38 +347,85 @@ function send(cmd) {
   if (widget) widget.webContents.send("cmd", cmd);
 }
 
+const PAUSES = [
+  [15, "15 minutes"],
+  [30, "30 minutes"],
+  [60, "1 hour"],
+  [120, "2 hours"],
+];
+
+function pauseItems() {
+  if (paused) return [{ label: "▶ Turn Posture Guard back on", click: () => send("resume") }];
+  return [
+    {
+      label: "Pause Posture Guard",
+      submenu: [...PAUSES.map(([m, l]) => ({ label: `For ${l}`, click: () => send(`pause:${m}`) })), { type: "separator" }, { label: "Until I turn it back on", click: () => send("pause") }],
+    },
+  ];
+}
+
+function toggleDot() {
+  if (!widget) return;
+  cfg.hideDot = widget.isVisible();
+  saveCfg();
+  if (cfg.hideDot) widget.hide();
+  else widget.showInactive();
+}
+
+/** Left click on the dot: the things you do most. */
+function quickMenu() {
+  return Menu.buildFromTemplate([
+    { label: `Upright: ${status.label}`, enabled: false },
+    { type: "separator" },
+    { label: "🧍 Quick stretch (1 min)", click: () => openFullApp("?start=stretch") },
+    { label: "🧘 Neck break", click: () => openFullApp("?start=default") },
+    { type: "separator" },
+    ...pauseItems(),
+    { label: "Recalibrate (sit tall first)", click: () => send("calibrate") },
+    { type: "separator" },
+    { label: "Open Upright", click: () => openFullApp() },
+  ]);
+}
+
 function menu() {
   return Menu.buildFromTemplate([
     { label: `Upright: ${status.label}`, enabled: false },
     ...(update.state === "ready" ? [{ label: `⬆ ${updateLabel()}`, click: installUpdate }] : []),
     { type: "separator" },
+    { label: "Open Upright", click: () => openFullApp() },
+    { label: "🧍 Quick stretch (1 min)", click: () => openFullApp("?start=stretch") },
+    { label: "🧘 Neck break", click: () => openFullApp("?start=default") },
+    { type: "separator" },
+    ...pauseItems(),
     { label: "Recalibrate (sit tall first)", click: () => send("calibrate") },
     { label: "Test a nudge", click: () => send("test") },
-    {
-      label: paused ? "Resume Posture Guard" : "Pause Posture Guard",
-      click: () => {
-        paused = !paused;
-        if (!exercising) send(paused ? "pause" : "resume");
-      },
-    },
     { type: "separator" },
-    { label: "Open full app (exercises, gym, progress)", click: () => openFullApp() },
-    { label: "Start a quick neck break", click: () => openFullApp("?start=default") },
-    {
-      label: widget && widget.isVisible() ? "Hide widget" : "Show widget",
-      click: () => (widget && widget.isVisible() ? widget.hide() : widget && widget.showInactive()),
-    },
+    { label: widget && widget.isVisible() ? "Hide the floating dot" : "Show the floating dot", click: toggleDot },
     {
       label: MAC ? "Open at login" : "Start with Windows",
       type: "checkbox",
       checked: app.getLoginItemSettings().openAtLogin,
-      click: (item) => app.setLoginItemSettings({ openAtLogin: item.checked }),
+      click: (item) => setOpenAtLogin(item.checked),
     },
     { type: "separator" },
     { label: updateLabel(), enabled: update.state !== "checking" && update.state !== "downloading", click: () => checkForUpdates(true) },
     { label: `Version ${app.getVersion()}`, enabled: false },
     { label: "Quit Upright", click: () => app.quit() },
   ]);
+}
+
+/** Start with the computer: quietly, as just the dot (no app window). */
+function setOpenAtLogin(on) {
+  app.setLoginItemSettings({ openAtLogin: !!on, args: ["--background"] });
+}
+/** Started by the computer at login (not by you clicking the icon)? */
+function startedAtLogin() {
+  if (process.argv.includes("--background")) return true;
+  try {
+    return MAC && !!app.getLoginItemSettings().wasOpenedAtLogin;
+  } catch {
+    return false;
+  }
 }
 
 function createTray() {
@@ -411,9 +462,51 @@ ipcMain.on("dragEnd", () => {
 });
 ipcMain.on("status", (_e, s) => {
   status = s || status;
+  if (s && typeof s.paused === "boolean") paused = s.paused;
   if (tray) tray.setToolTip(`Upright: ${status.label}`);
 });
 ipcMain.on("contextMenu", () => menu().popup({ window: widget }));
+ipcMain.on("quickMenu", () => quickMenu().popup({ window: widget }));
+
+/* ---------- native notifications (reminders and posture nudges) ---------- */
+let lastNotice = null;
+ipcMain.on("notify", (_e, n) => {
+  if (!n || !Notification.isSupported()) return;
+  // one at a time per kind: a new posture nudge replaces the last one
+  if (lastNotice && lastNotice.kind === n.kind) {
+    try {
+      lastNotice.n.close();
+    } catch {}
+  }
+  const note = new Notification({ title: String(n.title || "Upright"), body: String(n.body || ""), icon: path.join(__dirname, "icon.png"), silent: true });
+  note.on("click", () => {
+    if (!handleLink(n.link)) openFullApp();
+  });
+  note.show();
+  lastNotice = { kind: n.kind, n: note };
+});
+
+/* ---------- are you at the computer? (a break away from the desk counts as your stretch) ---------- */
+ipcMain.handle("idle", () => {
+  try {
+    return { sec: powerMonitor.getSystemIdleTime(), locked: powerMonitor.getSystemIdleState(60) === "locked" };
+  } catch {
+    return { sec: 0, locked: false };
+  }
+});
+
+/* ---------- desktop settings shown in the app's Settings ---------- */
+ipcMain.handle("prefs:get", () => ({ openAtLogin: app.getLoginItemSettings().openAtLogin, showDot: !cfg.hideDot }));
+ipcMain.on("prefs:set", (_e, p) => {
+  if (!p) return;
+  if (typeof p.openAtLogin === "boolean") setOpenAtLogin(p.openAtLogin);
+  if (typeof p.showDot === "boolean" && widget) {
+    cfg.hideDot = !p.showDot;
+    saveCfg();
+    if (cfg.hideDot) widget.hide();
+    else widget.showInactive();
+  }
+});
 ipcMain.on("exercising", (_e, on) => setExercising(!!on));
 
 /* ---------- start ---------- */
@@ -423,7 +516,7 @@ if (!app.requestSingleInstanceLock()) {
   // opening Upright again (desktop shortcut, Start menu, or an upright:// link) while it's already running
   app.on("second-instance", (_e, argv) => {
     if (!handleLink(linkFrom(argv))) {
-      if (widget) widget.showInactive();
+      if (widget && !cfg.hideDot) widget.showInactive();
       openFullApp();
     }
   });
@@ -440,13 +533,14 @@ if (!app.requestSingleInstanceLock()) {
   });
   app.on("activate", () => {
     if (!started) return;
-    if (widget) widget.showInactive();
+    if (widget && !cfg.hideDot) widget.showInactive();
     openFullApp();
   });
   // Mac: a menu-bar app; the dock icon only shows while the full app window is open
   if (MAC) app.dock?.hide();
   app.whenReady().then(async () => {
     cfg = loadCfg();
+    const freshInstall = !cfg.url && !cfg.anchor && !cfg.appBounds;
     if (!cfg.url) {
       cfg.url = DEFAULT_URL;
       saveCfg();
@@ -470,6 +564,19 @@ if (!app.requestSingleInstanceLock()) {
     // launched by a link (e.g. "Open Upright" on the website)
     const first = linkFrom(process.argv) || pendingLink;
     if (first) widget.once("ready-to-show", () => handleLink(first));
+    // You clicked the Upright icon: open the app too (first time: that's where setup is).
+    // Started with the computer: just the dot, quietly.
+    else if (!startedAtLogin() || !cfg.welcomed) widget.once("ready-to-show", () => openFullApp());
+    if (!cfg.welcomed) {
+      cfg.welcomed = true;
+      // a brand-new install starts with the computer (you can turn it off in Settings or the tray menu)
+      if (freshInstall && app.isPackaged && !process.env.UPRIGHT_PROFILE) setOpenAtLogin(true);
+      saveCfg();
+    }
+    // older versions turned on "start with the computer" without the quiet flag: add it
+    else if (app.isPackaged && app.getLoginItemSettings().openAtLogin && !cfg.loginArgs) setOpenAtLogin(true);
+    cfg.loginArgs = true;
+    saveCfg();
     started = true;
     screen.on("display-removed", () => {
       const wa = workAreaFor(anchor);

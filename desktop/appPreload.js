@@ -1,7 +1,8 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 // The full-app window tells the desktop app when an exercise session starts and ends (so the
-// posture dot can pause itself), and can show / trigger app updates in Settings.
+// posture dot can pause itself), shows / triggers app updates in Settings, shows native
+// notifications, and reads / changes the desktop settings (start with the computer, show the dot).
 contextBridge.exposeInMainWorld("uprightApp", {
   exercising: (on) => ipcRenderer.send("exercising", !!on),
   getUpdate: () => ipcRenderer.invoke("update:get"),
@@ -12,4 +13,9 @@ contextBridge.exposeInMainWorld("uprightApp", {
     ipcRenderer.on("update", h);
     return () => ipcRenderer.removeListener("update", h);
   },
+  // 1.4+
+  notify: (n) => ipcRenderer.send("notify", n),
+  idle: () => ipcRenderer.invoke("idle"),
+  getPrefs: () => ipcRenderer.invoke("prefs:get"),
+  setPrefs: (p) => ipcRenderer.send("prefs:set", p),
 });

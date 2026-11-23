@@ -92,3 +92,34 @@ export function nextReminderAt(s: Settings, st: ReminderState, now: number): num
   }
   return null;
 }
+
+/* ---------------- the other reminders (quick stretch, eye breaks, standing desk) ---------------- */
+
+export interface IntervalReminder {
+  on: boolean;
+  everyMin: number;
+  /** times that count as "just did it" (last done, last reminded, last away-from-desk break) */
+  last: (number | undefined)[];
+  snoozeUntil?: number;
+}
+
+/** Same rules as the neck-break reminder: only on your days and hours, after a snooze, every N minutes since the last one. */
+export function intervalDue(s: Settings, r: IntervalReminder, now: number): boolean {
+  if (!r.on || r.everyMin <= 0) return false;
+  if (!inActiveWindow(s, now)) return false;
+  if (r.snoozeUntil && now < r.snoozeUntil) return false;
+  const p = localParts(now, s.tz);
+  const windowStart = now - (p.hour * 60 + p.minute - s.startHour * 60) * 60_000;
+  const anchor = Math.max(windowStart, ...r.last.map((x) => x || 0));
+  if (r.snoozeUntil && r.snoozeUntil > anchor && r.snoozeUntil <= now) return true;
+  return now - anchor >= r.everyMin * 60_000 - 30_000;
+}
+
+export function nextIntervalAt(s: Settings, r: IntervalReminder, now: number): number | null {
+  if (!r.on || s.days.length === 0) return null;
+  const step = 60_000;
+  for (let t = now; t < now + 8 * 86_400_000; t += t - now < 6 * 3600_000 ? step : 5 * step) {
+    if (intervalDue(s, r, t)) return t;
+  }
+  return null;
+}

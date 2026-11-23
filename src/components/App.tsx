@@ -16,10 +16,10 @@ import GuardView, { STATUS_UI, useGuard } from "./GuardView";
 import { guard } from "@/lib/guard";
 import { Card } from "./ui";
 import { getRoutine, fmtDuration, routineSeconds } from "@/lib/exercises";
-import { getConfig, getDoc, getMeta, initStore, lastSessionEnd, linkDevice, cleanCode, setMeta, snooze, useConfig, useDoc, useMeta } from "@/lib/store";
-import { isReminderDue } from "@/lib/schedule";
+import { getConfig, getDoc, getMeta, initStore, linkDevice, cleanCode, setMeta, useConfig, useDoc, useMeta } from "@/lib/store";
+import { REMINDER_TEXT, onReminder, reminderDone, snoozeReminder, standText, startReminders, type ReminderKind } from "@/lib/reminders";
 import { todayKey } from "@/lib/stats";
-import { healPush, localNotify, notificationsSupported, registerSW, isIOS, isStandalone } from "@/lib/push";
+import { healPush, notificationsSupported, registerSW, isIOS, isStandalone } from "@/lib/push";
 import { sound } from "@/lib/sound";
 import type { Routine } from "@/lib/types";
 import type { GymPlan } from "@/lib/gym";
@@ -68,7 +68,7 @@ export default function App() {
   const [gymPlan, setGymPlan] = useState<GymPlan | null>(null);
   const [learnSection, setLearnSection] = useState<LearnSection>("desk");
   const [ready, setReady] = useState<Routine | null>(null);
-  const [due, setDue] = useState(false);
+  const [due, setDue] = useState<ReminderKind | null>(null);
   const [mounted, setMounted] = useState(false);
   const [perm, setPerm] = useState<string>("default");
   const installEvt = useRef<any>(null);
@@ -118,9 +118,11 @@ export default function App() {
       }
     }
 
+    // buttons on a browser notification (see sw.js)
     const onMsg = (e: MessageEvent) => {
-      if (e.data?.type === "snooze") setMeta({ snoozeUntil: Date.now() + (e.data.minutes ?? 30) * 60_000 });
-      if (e.data?.type === "start") setReady(getRoutine(getDoc().settings.defaultRoutine));
+      const kind = (e.data?.kind ?? "break") as ReminderKind;
+      if (e.data?.type === "snooze") snoozeReminder(kind);
+      if (e.data?.type === "start") setReady(getRoutine(kind === "stretch" ? "stretch" : getDoc().settings.defaultRoutine));
     };
     navigator.serviceWorker?.addEventListener("message", onMsg);
 
@@ -136,33 +138,22 @@ export default function App() {
     };
   }, []);
 
-  /* ---- in-app reminder clock ---- */
+  /* ---- reminders (neck breaks, quick stretch, eye breaks, standing desk): one window runs the clock ---- */
   useEffect(() => {
-    const check = () => {
-      const d = getDoc();
-      const m = getMeta();
-      const now = Date.now();
-      if (isReminderDue(d.settings, { lastSessionAt: lastSessionEnd(d), lastReminderAt: m.lastReminderAt, snoozeUntil: m.snoozeUntil }, now)) {
-        setMeta({ lastReminderAt: now, snoozeUntil: undefined });
-        setDue(true);
-        if (!playing) sound.gentle();
-        // Background push (if on) already notifies this device; otherwise notify from the page.
-        if (!(config?.push && m.pushOn)) {
-          const r = getRoutine(d.settings.defaultRoutine);
-          void localNotify("Time for a neck break 🧘", `${r.name} · ${fmtDuration(routineSeconds(r, d.settings.level))}. Sit tall and let's go.`);
-        }
-      }
-    };
-    check();
-    const i = setInterval(check, 30_000);
-    return () => clearInterval(i);
-  }, [config, playing]);
+    startReminders();
+    return onReminder((kind, done) => {
+      if (kind) setDue(kind);
+      else setDue((cur) => (cur === done ? null : cur));
+    });
+  }, []);
 
   function start(id: string) {
     sound.unlock(); // user gesture → audio allowed
     setReady(null);
-    setDue(false);
-    setPlaying(getRoutine(id));
+    setDue(null);
+    const r = getRoutine(id);
+    if (r.id === "stretch") reminderDone("stretch");
+    setPlaying(r);
   }
 
   const showSetup = mounted && !meta.welcomed;
@@ -208,28 +199,7 @@ export default function App() {
       </nav>
 
       <div className="content">
-        {due && !playing && (
-          <div className="due-banner">
-            <div>
-              <b>Time for a neck break 🧘</b>
-              <span>Sit tall. Two minutes, that&apos;s all.</span>
-            </div>
-            <div className="btn-row">
-              <button className="btn primary" onClick={() => start(doc.settings.defaultRoutine)}>
-                Start
-              </button>
-              <button
-                className="btn ghost"
-                onClick={() => {
-                  void snooze(30);
-                  setDue(false);
-                }}
-              >
-                Snooze 30m
-              </button>
-            </div>
-          </div>
-        )}
+        {due && !playing && <DueBanner kind={due} standing={!!meta.standing} onStart={start} defaultRoutine={doc.settings.defaultRoutine} snoozeMin={doc.settings.snoozeMin || 15} />}
 
         {mounted && tab === "today" && (
           <Today doc={doc} meta={meta} today={today} onStart={start} onOpenSettings={() => setTab("settings")} setupCard={setupCard} />
@@ -274,7 +244,7 @@ export default function App() {
         <div className="sheet-veil" onClick={() => setReady(null)}>
           <div className="sheet ready-sheet" onClick={(e) => e.stopPropagation()} style={{ ["--g1" as string]: ready.gradient[0], ["--g2" as string]: ready.gradient[1] }}>
             <div className="rt-emoji big">{ready.emoji}</div>
-            <h2>Neck break time</h2>
+            <h2>{ready.id === "stretch" ? "Quick stretch" : "Neck break time"}</h2>
             <p className="muted">
               {ready.name} · {fmtDuration(routineSeconds(ready, doc.settings.level))}
             </p>
@@ -284,11 +254,11 @@ export default function App() {
             <button
               className="btn ghost wide"
               onClick={() => {
-                void snooze(30);
+                snoozeReminder(ready.id === "stretch" ? "stretch" : "break");
                 setReady(null);
               }}
             >
-              Snooze 30 min
+              Snooze {doc.settings.snoozeMin || 15} min
             </button>
           </div>
         </div>
@@ -304,6 +274,42 @@ export default function App() {
 
       {gymPlan && <GymSession key={gymPlan.id} plan={gymPlan} onClose={() => setGymPlan(null)} />}
       {playing && <Player key={playing.id} routine={playing} onClose={() => setPlaying(null)} />}
+    </div>
+  );
+}
+
+/** The reminder banner at the top of the app (shows in every open window at once). */
+function DueBanner({ kind, standing, onStart, defaultRoutine, snoozeMin }: { kind: ReminderKind; standing: boolean; onStart: (id: string) => void; defaultRoutine: string; snoozeMin: number }) {
+  // the stand reminder already flipped "standing" when it fired, so show what it asked for
+  const text = kind === "stand" ? standText(!standing) : REMINDER_TEXT[kind];
+  return (
+    <div className={`due-banner due-${kind}`}>
+      <div>
+        <b>{text.title}</b>
+        <span>{text.body}</span>
+      </div>
+      <div className="btn-row">
+        {kind === "break" && (
+          <button className="btn primary" onClick={() => onStart(defaultRoutine)}>
+            Start
+          </button>
+        )}
+        {kind === "stretch" && (
+          <button className="btn primary" onClick={() => onStart("stretch")}>
+            Start (1 min)
+          </button>
+        )}
+        {kind !== "break" && (
+          <button className={`btn ${kind === "stretch" ? "ghost" : "primary"}`} onClick={() => reminderDone(kind)}>
+            {kind === "stand" ? "Done" : "Done it"}
+          </button>
+        )}
+        {kind !== "stand" && (
+          <button className="btn ghost" onClick={() => snoozeReminder(kind)}>
+            Snooze {snoozeMin} min
+          </button>
+        )}
+      </div>
     </div>
   );
 }
