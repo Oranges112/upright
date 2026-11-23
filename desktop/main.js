@@ -10,6 +10,10 @@ const fs = require("fs");
 const MAC = process.platform === "darwin";
 /** where Mac users download new versions (unsigned Mac apps can't update themselves) */
 const MAC_DOWNLOAD = "https://github.com/Oranges112/upright/releases/latest/download/Upright-Mac.dmg";
+/** zipped app, for updating itself in place (1.4+) */
+const MAC_ZIP = "https://github.com/Oranges112/upright/releases/latest/download/Upright-Mac.zip";
+const os = require("os");
+const { spawn, execFile } = require("child_process");
 const LATEST_RELEASE_API = "https://api.github.com/repos/Oranges112/upright/releases/latest";
 
 // Development: UPRIGHT_PROFILE=some-folder runs a separate copy (own settings, own single-instance lock).
@@ -221,8 +225,8 @@ function setUpdate(patch) {
   for (const w of [appWin, widget]) if (w && !w.isDestroyed()) w.webContents.send("update", updateInfo());
 }
 function updateInfo() {
-  // manual: the update is a download you install yourself (Mac), not a restart
-  return { ...update, current: app.getVersion(), manual: MAC, platform: MAC ? "mac" : "windows" };
+  // manual: the update is a download you install yourself (a Mac that can't replace the app), not a restart
+  return { ...update, current: app.getVersion(), manual: MAC && !macCanSelfUpdate(), platform: MAC ? "mac" : "windows" };
 }
 function updateLabel() {
   switch (update.state) {
@@ -231,7 +235,7 @@ function updateLabel() {
     case "downloading":
       return `Downloading update… ${update.pct}%`;
     case "ready":
-      return MAC ? `Download Upright ${update.version}` : `Restart to update to ${update.version}`;
+      return MAC && !macStaged ? `Download Upright ${update.version}` : `Restart to update to ${update.version}`;
     case "none":
       return `Up to date (${app.getVersion()}) · check again`;
     case "error":
@@ -261,7 +265,9 @@ function checkForUpdates(manual = false) {
 }
 function installUpdate() {
   if (MAC) {
-    if (update.state === "ready") void shell.openExternal(MAC_DOWNLOAD);
+    if (update.state !== "ready") return;
+    if (macStaged) return macSwapAndRestart(true);
+    void shell.openExternal(MAC_DOWNLOAD);
     return;
   }
   if (update.state !== "ready" || !updater) return;
@@ -275,12 +281,99 @@ function newer(a, b) {
   return false;
 }
 
-/**
- * Mac: Apple only lets signed apps replace themselves, so we look for a newer release and offer
- * the download. (Posture checks and screens still update by themselves: they load from the website.)
- */
+/* ---------- Mac: update itself without a paid Apple signature ---------- */
+// Apple's own updater only works for apps signed with a paid developer account. So on a Mac we
+// look for a newer release, download the zipped app quietly, and swap it in when you restart
+// (or the next time Upright quits), the same way Windows does. If the app can't be replaced
+// (e.g. it's running straight from the disk image), we fall back to offering the download.
+
+/** /Applications/Upright.app (the bundle we're running from) */
+function macAppPath() {
+  return path.resolve(process.execPath, "..", "..", "..");
+}
+function macCanSelfUpdate() {
+  if (!MAC || !app.isPackaged) return false;
+  const p = macAppPath();
+  if (!p.endsWith(".app") || p.includes("/AppTranslocation/") || p.startsWith("/Volumes/")) return false;
+  try {
+    fs.accessSync(path.dirname(p), fs.constants.W_OK);
+    fs.accessSync(p, fs.constants.W_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** the new version, unzipped and ready to swap in */
+let macStaged = null;
+let macInstalling = false;
+
+async function macDownload(version) {
+  const dir = path.join(os.tmpdir(), `upright-update-${version}`);
+  fs.rmSync(dir, { recursive: true, force: true });
+  fs.mkdirSync(dir, { recursive: true });
+  const zip = path.join(dir, "Upright-Mac.zip");
+  const res = await net.fetch(MAC_ZIP);
+  if (!res.ok || !res.body) throw new Error(`download ${res.status}`);
+  const total = Number(res.headers.get("content-length")) || 0;
+  const out = fs.createWriteStream(zip);
+  const reader = res.body.getReader();
+  let got = 0;
+  let lastPct = -1;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    got += value.length;
+    if (!out.write(Buffer.from(value))) await new Promise((r) => out.once("drain", r));
+    const pct = total ? Math.round((got / total) * 100) : 0;
+    if (pct !== lastPct) {
+      lastPct = pct;
+      setUpdate({ state: "downloading", version, pct });
+    }
+  }
+  await new Promise((r, j) => out.end((e) => (e ? j(e) : r())));
+  // unzip with the Mac's own tool (keeps the app's signature and permissions intact)
+  const unzipped = path.join(dir, "app");
+  await new Promise((r, j) => execFile("/usr/bin/ditto", ["-x", "-k", zip, unzipped], (e) => (e ? j(e) : r())));
+  const name = fs.readdirSync(unzipped).find((f) => f.endsWith(".app"));
+  if (!name) throw new Error("no app in the zip");
+  return path.join(unzipped, name);
+}
+
+/** Quit, swap the new app in, and (optionally) open it again. */
+function macSwapAndRestart(relaunch) {
+  if (!macStaged || macInstalling) return;
+  macInstalling = true;
+  const target = macAppPath();
+  const script = path.join(os.tmpdir(), "upright-swap.sh");
+  fs.writeFileSync(
+    script,
+    `#!/bin/sh
+# wait for Upright to close
+while kill -0 ${process.pid} 2>/dev/null; do sleep 0.3; done
+APP="$1"; NEW="$2"
+rm -rf "$APP.old"
+if mv "$APP" "$APP.old" && mv "$NEW" "$APP"; then
+  rm -rf "$APP.old"
+  xattr -dr com.apple.quarantine "$APP" 2>/dev/null
+else
+  # couldn't replace it: put the old one back
+  [ -d "$APP.old" ] && [ ! -d "$APP" ] && mv "$APP.old" "$APP"
+fi
+${relaunch ? 'open "$APP"' : ""}
+`,
+    { mode: 0o755 },
+  );
+  spawn("/bin/sh", [script, target, macStaged], { detached: true, stdio: "ignore" }).unref();
+  if (relaunch) app.quit();
+}
+
 async function checkMacUpdates(manual) {
-  if (update.state === "checking") return;
+  if (update.state === "checking" || update.state === "downloading") return;
+  if (update.state === "ready" && macStaged) {
+    if (manual) installUpdate();
+    return;
+  }
   manualCheck = manual;
   setUpdate({ state: "checking" });
   try {
@@ -288,15 +381,25 @@ async function checkMacUpdates(manual) {
     if (!res.ok) throw new Error(String(res.status));
     const rel = await res.json();
     const latest = String(rel.tag_name || "").replace(/^desktop-v/, "");
-    const hasMac = (rel.assets || []).some((a) => a.name === "Upright-Mac.dmg");
-    if (latest && hasMac && newer(latest, app.getVersion())) {
-      const firstTime = update.version !== latest;
-      setUpdate({ state: "ready", version: latest });
-      if (firstTime || manual) notify(`Upright ${latest} is available`, "Click to download it, then drag it into Applications to replace this one.", installUpdate);
-    } else {
+    const assets = (rel.assets || []).map((a) => a.name);
+    if (!(latest && assets.includes("Upright-Mac.dmg") && newer(latest, app.getVersion()))) {
       setUpdate({ state: "none" });
       if (manual) notify("Upright is up to date", `You have the newest version (${app.getVersion()}).`);
+      return;
     }
+    if (assets.includes("Upright-Mac.zip") && macCanSelfUpdate()) {
+      try {
+        macStaged = await macDownload(latest);
+        setUpdate({ state: "ready", version: latest, pct: 100 });
+        notify(`Upright ${latest} is ready`, "Click to restart and update now, or it'll update the next time Upright closes.", installUpdate);
+        return;
+      } catch {
+        macStaged = null; // fall back to the download below
+      }
+    }
+    const firstTime = update.version !== latest;
+    setUpdate({ state: "ready", version: latest });
+    if (firstTime || manual) notify(`Upright ${latest} is available`, "Click to download it, then drag it into Applications to replace this one.", installUpdate);
   } catch {
     setUpdate({ state: "error" });
     if (manual) notify("Couldn't check for updates", "Check your internet connection and try again.");
@@ -586,4 +689,8 @@ if (!app.requestSingleInstanceLock()) {
   });
   // keep running in the tray when the full-app window is closed
   app.on("window-all-closed", (e) => e.preventDefault());
+  // Mac: a downloaded update goes in when Upright quits
+  app.on("will-quit", () => {
+    if (MAC && macStaged && !macInstalling) macSwapAndRestart(false);
+  });
 }

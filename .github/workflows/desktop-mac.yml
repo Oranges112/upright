@@ -3,7 +3,8 @@
 # by hand (Actions → Mac desktop app → Run workflow) for an existing release tag.
 #
 # The app is ad-hoc signed only (no paid Apple Developer account), so the first time someone opens
-# it macOS asks them to allow it in System Settings → Privacy & Security → Open Anyway.
+# it macOS asks them to allow it in System Settings → Privacy & Security → Open Anyway. After that,
+# installed copies (1.4+) update themselves from Upright-Mac.zip.
 name: Mac desktop app
 
 on:
@@ -48,9 +49,10 @@ jobs:
           codesign --verify --deep --verbose=2 "$app"
           /usr/libexec/PlistBuddy -c "Print :NSCameraUsageDescription" "$app/Contents/Info.plist"
           lipo -archs "$app/Contents/MacOS/Upright"
-          ls -la dist/*.dmg
+          ls -la dist/*.dmg dist/*.zip
       - name: Attach to the release
         working-directory: desktop
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "$TAG" dist/Upright-Mac.dmg --clobber --repo "$GITHUB_REPOSITORY"
+        # the .zip is what installed copies download to update themselves
+        run: gh release upload "$TAG" dist/Upright-Mac.dmg dist/Upright-Mac.zip --clobber --repo "$GITHUB_REPOSITORY"

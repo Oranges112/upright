@@ -10,7 +10,7 @@
     "start": "electron .",
     "dev": "set UPRIGHT_URL=http://localhost:3000/&& electron .",
     "dist": "electron-builder --win portable nsis",
-    "dist:mac": "electron-builder --mac dmg --universal --publish never"
+    "dist:mac": "electron-builder --mac dmg zip --universal --publish never"
   },
   "build": {
     "appId": "app.upright.desktop",
@@ -27,7 +27,7 @@
     "mac": {
       "icon": "icon.png",
       "category": "public.app-category.healthcare-fitness",
-      "target": "dmg",
+      "target": ["dmg", "zip"],
       "identity": "-",
       "hardenedRuntime": false,
       "gatekeeperAssess": false,
@@ -35,6 +35,9 @@
       "extendInfo": {
         "NSCameraUsageDescription": "Upright watches your posture with the camera. Everything stays on your Mac: no video is recorded or uploaded."
       }
+    },
+    "zip": {
+      "artifactName": "Upright-Mac.zip"
     },
     "dmg": {
       "artifactName": "Upright-Mac.dmg",
