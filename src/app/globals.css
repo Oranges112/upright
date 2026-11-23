@@ -3875,3 +3875,56 @@ button.link {
 .pain-card .feel-line {
   margin-top: 8px;
 }
+
+/* ---------------- linking guide (Settings) ---------------- */
+.guide-sheet h2 {
+  font-size: 1.35rem;
+  margin-bottom: 6px;
+}
+.guide-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 16px 0;
+  padding-left: 20px;
+}
+.guide-steps li > b {
+  display: block;
+  margin-bottom: 2px;
+}
+.guide-steps li > span {
+  display: block;
+  color: var(--muted);
+  font-size: 0.92rem;
+  line-height: 1.45;
+  margin-bottom: 8px;
+}
+.guide-keys {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.guide-keys small {
+  font-weight: 600;
+  margin-top: 6px;
+}
+.copy-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.copy-row code {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.78rem;
+  padding: 6px 8px;
+  border-radius: 8px;
+  background: var(--card-2);
+}
+.btn.small {
+  padding: 6px 10px;
+  font-size: 0.8rem;
+}

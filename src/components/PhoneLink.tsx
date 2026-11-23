@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import qrcode from "qrcode-generator";
 import { Card } from "./ui";
 import { BASE } from "@/lib/base";
+import LinkGuide from "./LinkGuide";
 import { cleanCode, linkDevice, prettyCode, syncNow, type Meta, type ServerConfig } from "@/lib/store";
 
 /** The public web address of this copy of Upright (what a phone should open). */
@@ -38,7 +39,9 @@ export default function PhoneLink({ meta, config, flash }: { meta: Meta; config:
     if (sync && !meta.code) void syncNow();
   }, [sync, meta.code]);
 
-  const link = meta.code ? `${siteUrl()}#link=${meta.code}` : "";
+  const [guide, setGuide] = useState(false);
+  // a copy connected to its own server tells the phone where it is, too
+  const link = meta.code ? `${siteUrl()}#link=${meta.code}${meta.apiUrl ? `&server=${encodeURIComponent(meta.apiUrl)}` : ""}` : "";
 
   return (
     <Card>
@@ -112,16 +115,16 @@ export default function PhoneLink({ meta, config, flash }: { meta: Meta; config:
               <p className="muted small">Scan with your phone&apos;s camera to open it, then add it to your home screen. Great for gym workouts and reminders on the go.</p>
               <p className="row-hint">
                 Linking phone and computer (so progress is shared) isn&apos;t switched on for this copy yet. Until then, use <b>Export backup</b> / <b>Import backup</b> below to move
-                your progress. Want linking?{" "}
-                <a href="https://github.com/Oranges112/upright#host-your-own-copy-about-10-minutes-free-tiers" target="_blank" rel="noreferrer">
-                  Here&apos;s how to set it up (free, about 10 min)
-                </a>
-                .
+                your progress.
               </p>
+              <button className="btn ghost" onClick={() => setGuide(true)}>
+                🔗 Set up linking (free, about 10 min)
+              </button>
             </div>
           </div>
         </>
       )}
+      {guide && <LinkGuide onClose={() => setGuide(false)} />}
     </Card>
   );
 }

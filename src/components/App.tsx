@@ -109,6 +109,18 @@ export default function App() {
       url.searchParams.delete("start");
       history.replaceState(null, "", url.pathname + url.hash);
     }
+    // a link from another device can carry its server: use the same one
+    const srv = location.hash.match(/server=([^&]+)/);
+    if (srv) {
+      try {
+        const u = new URL(decodeURIComponent(srv[1]));
+        if (u.protocol === "https:" && u.origin !== location.origin && !getMeta().apiUrl) {
+          setMeta({ apiUrl: u.origin });
+          location.reload();
+          return;
+        }
+      } catch {}
+    }
     const m = location.hash.match(/link=([A-Za-z0-9-]+)/);
     if (m) {
       const c = cleanCode(m[1]);

@@ -15,7 +15,16 @@ export const asset = (path: string) => `${BASE}${path}`;
  * with NEXT_PUBLIC_API_URL, so phone and computer sync wherever you opened Upright.
  */
 export const API = (process.env.NEXT_PUBLIC_API_URL ?? "").trim().replace(/\/$/, "");
+/**
+ * The server in use: one you connected in Settings (Phone & computer → set up), or the built-in one.
+ * (Read straight from saved settings, so it works before anything else loads.)
+ */
+export function apiBase(): string {
+  try {
+    const m = JSON.parse(localStorage.getItem("upright:meta") || "{}");
+    if (typeof m.apiUrl === "string" && m.apiUrl) return m.apiUrl.replace(/\/+$/, "");
+  } catch {}
+  return API;
+}
 /** Full address of a server route, e.g. api("/api/sync"). */
-export const api = (path: string) => `${API}${path}`;
-/** Is there a server to sync with? */
-export const HAS_SERVER = !STATIC || API !== "";
+export const api = (path: string) => `${apiBase()}${path}`;

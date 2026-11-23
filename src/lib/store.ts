@@ -4,7 +4,7 @@ import { useSyncExternalStore } from "react";
 import type { Area, CheckIn, Doc, GuardDay, PostureTest, SessionLog, Settings, TestType } from "./types";
 import { emptyDoc, mergeDocs, normalize } from "./merge";
 import { dayKey } from "./schedule";
-import { API, STATIC, api } from "./base";
+import { STATIC, api, apiBase } from "./base";
 
 const KEY = "upright:v1";
 const META_KEY = "upright:meta";
@@ -60,6 +60,8 @@ export interface Meta {
   lastPainCheckAt?: number;
   /** last weekly summary dismissed (week key) */
   weeklySeen?: string;
+  /** your own sync server (Settings → Phone & computer), for copies without one built in */
+  apiUrl?: string;
 }
 
 export interface ServerConfig {
@@ -384,7 +386,7 @@ export async function initStore() {
   getDoc();
   getMeta();
   try {
-    if (STATIC && !API) throw new Error("no server in the static build");
+    if (STATIC && !apiBase()) throw new Error("no server connected to the static build");
     const res = await fetch(api("/api/config"), { cache: "no-store" });
     config = res.ok ? ((await res.json()) as ServerConfig) : { sync: false, push: false };
   } catch {
