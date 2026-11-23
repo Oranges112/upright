@@ -3,6 +3,7 @@
 import { signalExercising } from "@/lib/desktop";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Figure from "./Figure";
+import { PoseFigure } from "./GymFigure";
 import Ring from "./Ring";
 import { EXERCISES, LEVEL_INFO, buildTimeline, fmtClock, type Level, type Step } from "@/lib/exercises";
 import type { Routine } from "@/lib/types";
@@ -354,7 +355,15 @@ export default function Player({ routine, onClose }: Props) {
         <div className={`stage-row ${mirrorOn ? "with-mirror" : ""}`}>
         <div className={`player-stage view-${ex.view}`}>
           <div className={`figure-wrap ${step.kind}`}>
-            <Figure view={ex.view} pose={demoPose} speed={moveSpeed} hints={step.kind === "work"} />
+            {ex.body ? (
+              <PoseFigure
+                scene={ex.body.scene}
+                pose={(step.kind === "work" ? step.body : demoFlip && step.kind === "prep" ? ex.cycle[0].body : ex.cycle[ex.cycle.length - 1].body) ?? ex.cycle[0].body!}
+                speed={moveSpeed}
+              />
+            ) : (
+              <Figure view={ex.view} pose={demoPose} speed={moveSpeed} hints={step.kind === "work"} />
+            )}
           </div>
           <div className="stage-ring">
             <Ring progress={phaseProgress} size={132} stroke={9} colors={[routine.gradient[0], routine.gradient[1]]}>

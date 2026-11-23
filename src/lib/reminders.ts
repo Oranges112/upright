@@ -89,7 +89,7 @@ function fire(kind: ReminderKind) {
   let text = REMINDER_TEXT[kind];
   let routine: string | undefined;
   if (kind === "break") {
-    const r = getRoutine(s.defaultRoutine);
+    const r = getRoutine(s.defaultRoutine, s);
     routine = r.id;
     text = { title: text.title, body: `${r.name} · ${fmtDuration(routineSeconds(r, s.level))}. Sit tall and let's go.` };
   }
@@ -189,6 +189,14 @@ export function startReminders() {
   });
   const run = () => {
     leader = true;
+    // first time: count from now, so a new reminder doesn't fire the moment you open the app
+    const m = getMeta();
+    const now = Date.now();
+    const init: Partial<Meta> = {};
+    if (!m.lastStretchReminderAt) init.lastStretchReminderAt = now;
+    if (!m.lastEyeAt) init.lastEyeAt = now;
+    if (!m.lastStandSwitchAt) init.lastStandSwitchAt = now;
+    if (Object.keys(init).length) setMeta(init);
     void tick();
     setInterval(() => void tick(), TICK * 1000);
   };

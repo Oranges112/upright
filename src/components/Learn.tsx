@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { COACHING } from "@/lib/coaching";
-import { EXERCISES, KIND } from "@/lib/exercises";
+import { AREA_NAME, EXERCISES, KIND, forYou } from "@/lib/exercises";
+import { updateSettings, useDoc } from "@/lib/store";
 import { GROUPS, GYM, type GymExercise, type GymGroup } from "@/lib/gym";
 import { GUIDES, type Guide } from "@/lib/guides";
 import type { Exercise } from "@/lib/types";
-import GymFigure from "./GymFigure";
+import GymFigure, { PoseFigure } from "./GymFigure";
 import Figure from "./Figure";
 import { Sheet } from "./ui";
 
@@ -14,6 +15,23 @@ export type LearnSection = "desk" | "gym" | "guides";
 
 /** A figure that loops through the exercise's phases forever. */
 export function LoopFigure({ ex, size }: { ex: Exercise; size?: number }) {
+  if (ex.body) return <BodyLoop ex={ex} />;
+  return <UpperLoop ex={ex} size={size} />;
+}
+
+/** Full-body exercises (legs, hips, lower back): loop through the phases. */
+function BodyLoop({ ex }: { ex: Exercise }) {
+  const [i, setI] = useState(0);
+  const poses = ex.cycle.length > 1 ? ex.cycle.map((c) => c.body!) : [ex.cycle[0].body!];
+  useEffect(() => {
+    if (poses.length < 2) return;
+    const t = setInterval(() => setI((x) => (x + 1) % poses.length), 1600);
+    return () => clearInterval(t);
+  }, [poses.length]);
+  return <PoseFigure scene={ex.body!.scene} pose={poses[i % poses.length]} speed={0.9} />;
+}
+
+function UpperLoop({ ex, size }: { ex: Exercise; size?: number }) {
   const [i, setI] = useState(0);
   const poses = ex.cycle.length > 1 ? ex.cycle.map((c) => c.pose) : [{}, ex.cycle[0].pose];
   useEffect(() => {
@@ -195,6 +213,9 @@ export default function Learn({ section, onSection }: { section: LearnSection; o
   const [group, setGroup] = useState<GymGroup | "all">("all");
 
   const gymList = Object.values(GYM).filter((g) => group === "all" || g.group === group);
+  const settings = useDoc().settings;
+  const showAll = settings.showAll || settings.areas.length === 0;
+  const deskList = Object.values(EXERCISES).filter((ex) => showAll || forYou(ex.areas, settings.areas));
 
   return (
     <div className="view learn">
@@ -221,9 +242,17 @@ export default function Learn({ section, onSection }: { section: LearnSection; o
 
       {section === "desk" && (
         <>
-          <p className="muted small">All {Object.keys(EXERCISES).length} desk exercises. Tap one to see how to do it, why it helps and what to watch out for.</p>
+          <p className="muted small">
+            {showAll ? `All ${deskList.length} desk exercises.` : `${deskList.length} desk exercises for your ${settings.areas.map((a) => AREA_NAME[a].toLowerCase()).join(", ")}.`} Tap one to see how to do it,
+            why it helps and what to watch out for.{" "}
+            {settings.areas.length > 0 && (
+              <button className="link" onClick={() => updateSettings({ showAll: !settings.showAll })}>
+                {showAll ? "Only show mine" : "Show all"}
+              </button>
+            )}
+          </p>
           <div className="ex-grid">
-            {Object.values(EXERCISES).map((ex) => (
+            {deskList.map((ex) => (
               <button key={ex.id} className="ex-tile" onClick={() => setDesk(ex)}>
                 <div className="ex-fig">
                   <LoopFigure ex={ex} />

@@ -15,6 +15,8 @@ export interface Coaching {
   avoid: string;
 }
 
+import { LOWER_COACHING } from "./lower";
+
 export const COACHING: Record<string, Coaching> = {
   "chin-tuck": {
     why: "Tech neck weakens the deep muscles at the front of your neck and overloads the ones at the back. Chin tucks retrain those deep stabilisers so your head naturally sits back over your shoulders.",
@@ -160,6 +162,7 @@ export const COACHING: Record<string, Coaching> = {
     ],
     avoid: "Don't push so hard that your neck strains or shakes.",
   },
+  ...LOWER_COACHING,
 };
 
 /** Everything to rotate through while you work: why it helps, where to feel it, the tips, then the mistake to avoid. */

@@ -65,6 +65,8 @@ export interface SidePose {
   kd2?: number;
   /** absolute foot angle for the near leg (e.g. -90 = laid flat behind you when kneeling) */
   ft?: number;
+  /** absolute foot angle for the far leg */
+  ft2?: number;
 }
 
 /** Front view (used for moves that happen out to the sides). */
@@ -182,7 +184,7 @@ export function joints(p: SidePose): Joints {
   const a2 = arm(base, tUpper, p.s2 ?? p.s, p.e2 ?? p.e, hand2, p.ed2 ?? p.ed, p.ua2 ?? p.ua);
   const l1 = leg(hip, p.t, p.h, p.k, p.foot, p.kd, p.ft);
   const foot2 = p.foot2 ?? (p.h2 === undefined ? p.foot : undefined);
-  const l2 = leg(hip, p.t, p.h2 ?? p.h, p.k2 ?? p.k, foot2, p.kd2 ?? p.kd);
+  const l2 = leg(hip, p.t, p.h2 ?? p.h, p.k2 ?? p.k, foot2, p.kd2 ?? p.kd, p.ft2);
   return {
     hip,
     mid,

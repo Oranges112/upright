@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import MiniWidget from "./MiniWidget";
 import { syncWidgetTheme, useWidgetWindow } from "@/lib/widget";
 import Today from "./Today";
+import Setup from "./Setup";
 import Routines from "./Routines";
 import Progress from "./Progress";
 import SettingsView from "./SettingsView";
@@ -104,7 +105,7 @@ export default function App() {
     const url = new URL(location.href);
     const start = url.searchParams.get("start");
     if (start) {
-      setReady(getRoutine(start === "default" ? getDoc().settings.defaultRoutine : start));
+      setReady(getRoutine(start === "default" ? getDoc().settings.defaultRoutine : start, getDoc().settings));
       url.searchParams.delete("start");
       history.replaceState(null, "", url.pathname + url.hash);
     }
@@ -122,7 +123,7 @@ export default function App() {
     const onMsg = (e: MessageEvent) => {
       const kind = (e.data?.kind ?? "break") as ReminderKind;
       if (e.data?.type === "snooze") snoozeReminder(kind);
-      if (e.data?.type === "start") setReady(getRoutine(kind === "stretch" ? "stretch" : getDoc().settings.defaultRoutine));
+      if (e.data?.type === "start") setReady(getRoutine(kind === "stretch" ? "stretch" : getDoc().settings.defaultRoutine, getDoc().settings));
     };
     navigator.serviceWorker?.addEventListener("message", onMsg);
 
@@ -151,35 +152,13 @@ export default function App() {
     sound.unlock(); // user gesture → audio allowed
     setReady(null);
     setDue(null);
-    const r = getRoutine(id);
+    const r = getRoutine(id, getDoc().settings);
     if (r.id === "stretch") reminderDone("stretch");
     setPlaying(r);
   }
 
-  const showSetup = mounted && !meta.welcomed;
-
-  const setupCard = showSetup ? (
-    <Card className="setup">
-      <h3>Welcome to Upright 🌿</h3>
-      <p className="muted small">
-        Short, guided neck & posture breaks that fit into a workday. Set how often you want nudging, and Upright does each exercise with you: timers,
-        chimes and voice.
-      </p>
-      <ul className="setup-list">
-        <li className={perm === "granted" ? "ok" : ""}>{perm === "granted" ? "✅" : "1."} Allow notifications so we can remind you</li>
-        <li>{isStandalone() ? "✅" : "2."} {isIOS() ? "Add to Home Screen (Share → Add to Home Screen)" : "Install the app for a native feel"}</li>
-        <li>3. Do your first 2-minute session</li>
-      </ul>
-      <div className="btn-row">
-        <button className="btn primary" onClick={() => setTab("settings")}>
-          Set up reminders
-        </button>
-        <button className="btn ghost" onClick={() => setMeta({ welcomed: true })}>
-          Got it
-        </button>
-      </div>
-    </Card>
-  ) : null;
+  // first time: the setup (what bothers you, safety check, your reminders)
+  const showSetup = mounted && !meta.setupDone;
 
   return (
     <div className="shell">
@@ -202,7 +181,7 @@ export default function App() {
         {due && !playing && <DueBanner kind={due} standing={!!meta.standing} onStart={start} defaultRoutine={doc.settings.defaultRoutine} snoozeMin={doc.settings.snoozeMin || 15} />}
 
         {mounted && tab === "today" && (
-          <Today doc={doc} meta={meta} today={today} onStart={start} onOpenSettings={() => setTab("settings")} setupCard={setupCard} />
+          <Today doc={doc} meta={meta} today={today} onStart={start} onOpenSettings={() => setTab("settings")} />
         )}
         {mounted && tab === "routines" && (
           <Routines
@@ -222,6 +201,7 @@ export default function App() {
         {mounted && tab === "progress" && <Progress doc={doc} today={today} />}
         {mounted && tab === "settings" && (
           <SettingsView
+            onRedoSetup={() => setMeta({ setupDone: false })}
             doc={doc}
             meta={meta}
             config={config}
@@ -271,6 +251,15 @@ export default function App() {
         </button>
       )}
       {widgetWin && createPortal(<MiniWidget today={today} />, widgetWin.document.body)}
+
+      {showSetup && (
+        <Setup
+          onDone={(first) => {
+            setTab("today");
+            if (first) start(getDoc().settings.defaultRoutine);
+          }}
+        />
+      )}
 
       {gymPlan && <GymSession key={gymPlan.id} plan={gymPlan} onClose={() => setGymPlan(null)} />}
       {playing && <Player key={playing.id} routine={playing} onClose={() => setPlaying(null)} />}

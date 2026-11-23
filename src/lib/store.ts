@@ -285,6 +285,11 @@ export function updateSettings(patch: Partial<Settings>) {
   setDoc({ ...d, settings: { ...d.settings, ...patch, updatedAt: Date.now() } });
 }
 
+/** Replace this device's data with a (merged) backup. */
+export function importDoc(d: Doc) {
+  setDoc(normalize(d));
+}
+
 export function lastSessionEnd(d: Doc): number | undefined {
   const s = d.sessions[d.sessions.length - 1];
   return s ? s.startedAt + s.durationSec * 1000 : undefined;

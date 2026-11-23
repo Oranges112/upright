@@ -39,7 +39,7 @@ async function handle(req: Request) {
       const lastSessionAt = last ? last.startedAt + last.durationSec * 1000 : undefined;
       if (!isReminderDue(doc.settings, { lastSessionAt, lastReminderAt: meta.lastReminderAt, snoozeUntil: meta.snoozeUntil }, now)) continue;
 
-      const r = getRoutine(doc.settings.defaultRoutine);
+      const r = getRoutine(doc.settings.defaultRoutine, doc.settings);
       const [title, body] = MESSAGES[Math.floor(Math.random() * MESSAGES.length)];
       const n = await pushToUser(code, {
         title,

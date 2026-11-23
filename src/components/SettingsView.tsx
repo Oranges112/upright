@@ -5,11 +5,15 @@ import DesktopUpdates from "./DesktopUpdates";
 import NotifCheck from "./NotifCheck";
 import { useEffect, useState } from "react";
 import { Card, Chips, Toggle, hourLabel } from "./ui";
-import { LEVEL_INFO, ROUTINES, buildTimeline, getRoutine, type Level } from "@/lib/exercises";
+import { AREAS, EXERCISES, LEVEL_INFO, ROUTINES, buildTimeline, getRoutine, myMix, type Level } from "@/lib/exercises";
+import { appBridge, type DesktopPrefs } from "@/lib/desktop";
+import { mergeDocs, normalize } from "@/lib/merge";
 import type { Doc } from "@/lib/types";
 import {
   cleanCode,
   getDoc,
+  setMeta,
+  importDoc,
   linkDevice,
   prettyCode,
   resetLocal,
@@ -24,8 +28,28 @@ import { BASE, STATIC } from "@/lib/base";
 
 const DAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
-export default function SettingsView({ doc, meta, config, installPrompt }: { doc: Doc; meta: Meta; config: ServerConfig | null; installPrompt: (() => void) | null }) {
+export default function SettingsView({
+  doc,
+  meta,
+  config,
+  installPrompt,
+  onRedoSetup,
+}: {
+  doc: Doc;
+  meta: Meta;
+  config: ServerConfig | null;
+  installPrompt: (() => void) | null;
+  onRedoSetup: () => void;
+}) {
   const s = doc.settings;
+  const [desk, setDesk] = useState<DesktopPrefs | null>(null);
+  useEffect(() => {
+    void appBridge()?.getPrefs?.().then(setDesk);
+  }, []);
+  const setDeskPref = (p: Partial<DesktopPrefs>) => {
+    if (desk) setDesk({ ...desk, ...p });
+    appBridge()?.setPrefs?.(p);
+  };
   const [perm, setPerm] = useState<NotificationPermission | "unsupported">("default");
   const [msg, setMsg] = useState<string | null>(null);
   const [linkInput, setLinkInput] = useState("");
@@ -82,61 +106,149 @@ export default function SettingsView({ doc, meta, config, installPrompt }: { doc
       {msg && <div className="toast">{msg}</div>}
 
       <Card>
-        <h3 className="card-title">⏰ Reminders</h3>
-        <Toggle label="Remind me to do my exercises" on={s.remindersOn} onChange={(v) => updateSettings({ remindersOn: v })} />
-        <div className={s.remindersOn ? "" : "dim"}>
+        <h3 className="card-title">🎯 What bothers you</h3>
+        <p className="muted small">You only see exercises for these. Tap to add or remove.</p>
+        <div className="area-chips">
+          {AREAS.map((a) => {
+            const on = s.areas.includes(a.id);
+            return (
+              <button
+                key={a.id}
+                className={`chip ${on ? "on" : ""}`}
+                onClick={() => {
+                  const areas = on ? s.areas.filter((x) => x !== a.id) : [...s.areas, a.id];
+                  updateSettings({ areas });
+                }}
+              >
+                {a.emoji} {a.name}
+              </button>
+            );
+          })}
+        </div>
+        <Toggle label="Also show exercises for other areas" on={s.showAll} onChange={(v) => updateSettings({ showAll: v })} />
+        {s.areas.length > 0 && <span className="row-hint">My Mix right now: {myMix(s).exercises.map((id) => EXERCISES[id].name).join(", ")}.</span>}
+        {s.skip.length > 0 && (
           <div className="field-block">
-            <span className="row-label">Every</span>
-            <Chips
-              options={[30, 45, 60, 90, 120, 180]}
-              value={s.intervalMin}
-              onChange={(v) => updateSettings({ intervalMin: v })}
-              format={(v) => (v < 60 ? `${v} min` : `${v / 60} h`.replace(".5 h", "½ h"))}
-            />
-          </div>
-          <div className="field-block two">
-            <label className="field">
-              <span>From</span>
-              <select value={s.startHour} onChange={(e) => updateSettings({ startHour: Number(e.target.value) })}>
-                {Array.from({ length: 24 }, (_, h) => (
-                  <option key={h} value={h} disabled={h >= s.endHour}>
-                    {hourLabel(h)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="field">
-              <span>Until</span>
-              <select value={s.endHour} onChange={(e) => updateSettings({ endHour: Number(e.target.value) })}>
-                {Array.from({ length: 24 }, (_, h) => h + 1).map((h) => (
-                  <option key={h} value={h} disabled={h <= s.startHour}>
-                    {hourLabel(h)}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-          <div className="field-block">
-            <span className="row-label">On these days</span>
-            <div className="days">
-              {DAYS.map((d, i) => {
-                const on = s.days.includes(i);
-                return (
-                  <button
-                    key={d}
-                    className={`day ${on ? "on" : ""}`}
-                    onClick={() => updateSettings({ days: on ? s.days.filter((x) => x !== i) : [...s.days, i].sort() })}
-                  >
-                    {d[0]}
+            <span className="row-label">Moves you said hurt (swapped for gentler ones)</span>
+            <div className="skip-list">
+              {s.skip.map((id) => (
+                <span key={id} className="skip-item">
+                  {EXERCISES[id]?.name ?? id}
+                  <button className="link" onClick={() => updateSettings({ skip: s.skip.filter((x) => x !== id) })}>
+                    Bring back
                   </button>
-                );
-              })}
+                </span>
+              ))}
             </div>
-            <span className="row-hint">Days that are off never break your streak.</span>
           </div>
+        )}
+        <div className="btn-row" style={{ marginTop: 10 }}>
+          <button className="btn ghost" onClick={onRedoSetup}>
+            Redo the setup
+          </button>
+        </div>
+      </Card>
+
+      <Card>
+        <h3 className="card-title">⏰ Reminders</h3>
+        <p className="muted small">Each one has its own switch and timing. They only come on your days, between your hours.</p>
+        <div className="field-block two" style={{ borderTop: 0, paddingTop: 0 }}>
+          <label className="field">
+            <span>From</span>
+            <select value={s.startHour} onChange={(e) => updateSettings({ startHour: Number(e.target.value) })}>
+              {Array.from({ length: 24 }, (_, h) => (
+                <option key={h} value={h} disabled={h >= s.endHour}>
+                  {hourLabel(h)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="field">
+            <span>Until</span>
+            <select value={s.endHour} onChange={(e) => updateSettings({ endHour: Number(e.target.value) })}>
+              {Array.from({ length: 24 }, (_, h) => h + 1).map((h) => (
+                <option key={h} value={h} disabled={h <= s.startHour}>
+                  {hourLabel(h)}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
         <div className="field-block">
-          <span className="row-label">Daily goal</span>
+          <span className="row-label">On these days</span>
+          <div className="days">
+            {DAYS.map((d, i) => {
+              const on = s.days.includes(i);
+              return (
+                <button key={d} className={`day ${on ? "on" : ""}`} onClick={() => updateSettings({ days: on ? s.days.filter((x) => x !== i) : [...s.days, i].sort() })}>
+                  {d[0]}
+                </button>
+              );
+            })}
+          </div>
+          <span className="row-hint">Days that are off never break your streak.</span>
+        </div>
+
+        <div className="rem-block">
+          <Toggle label="🧘 Exercise breaks" hint="A guided routine (your main routine, below)." on={s.remindersOn} onChange={(v) => updateSettings({ remindersOn: v })} />
+          <div className={s.remindersOn ? "" : "dim"}>
+            <Chips options={[30, 45, 60, 90, 120, 180]} value={s.intervalMin} onChange={(v) => updateSettings({ intervalMin: v })} format={(v) => `every ${fmtEvery(v)}`} />
+          </div>
+        </div>
+
+        <div className="rem-block">
+          <Toggle
+            label="🧍 Quick stretch"
+            hint="Stand up and move for a minute."
+            on={s.stretchOn}
+            onChange={(v) => {
+              updateSettings({ stretchOn: v });
+              if (v) setMeta({ lastStretchReminderAt: Date.now() });
+            }}
+          />
+          <div className={s.stretchOn ? "" : "dim"}>
+            <Chips options={[30, 45, 60, 90, 120]} value={s.stretchMin} onChange={(v) => updateSettings({ stretchMin: v })} format={(v) => `every ${fmtEvery(v)}`} />
+          </div>
+        </div>
+
+        <div className="rem-block">
+          <Toggle
+            label="👀 Eye breaks (20-20-20)"
+            hint="Look about 6 m (20 ft) away for 20 seconds."
+            on={s.eyeOn}
+            onChange={(v) => {
+              updateSettings({ eyeOn: v });
+              if (v) setMeta({ lastEyeAt: Date.now() });
+            }}
+          />
+          <div className={s.eyeOn ? "" : "dim"}>
+            <Chips options={[15, 20, 30, 45, 60]} value={s.eyeMin} onChange={(v) => updateSettings({ eyeMin: v })} format={(v) => `every ${fmtEvery(v)}`} />
+          </div>
+        </div>
+
+        <div className="rem-block">
+          <Toggle
+            label="🔁 Standing desk"
+            hint="Switch between sitting and standing."
+            on={s.standDeskOn}
+            onChange={(v) => {
+              updateSettings({ standDeskOn: v });
+              if (v) setMeta({ lastStandSwitchAt: Date.now() });
+            }}
+          />
+          <div className={s.standDeskOn ? "" : "dim"}>
+            <Chips options={[30, 45, 60, 90]} value={s.standDeskMin} onChange={(v) => updateSettings({ standDeskMin: v })} format={(v) => `switch every ${fmtEvery(v)}`} />
+          </div>
+        </div>
+
+        <div className="field-block">
+          <span className="row-label">Snooze lasts</span>
+          <Chips options={[5, 10, 15, 30, 60]} value={s.snoozeMin} onChange={(v) => updateSettings({ snoozeMin: v })} format={(v) => fmtEvery(v)} />
+        </div>
+        <Toggle label="Play a chime with reminders" on={s.reminderSound} onChange={(v) => updateSettings({ reminderSound: v })} />
+
+        <div className="field-block">
+          <span className="row-label">Daily goal (exercise sessions)</span>
           <div className="stepper">
             <button onClick={() => updateSettings({ dailyGoal: Math.max(1, s.dailyGoal - 1) })}>−</button>
             <b>
@@ -146,6 +258,46 @@ export default function SettingsView({ doc, meta, config, installPrompt }: { doc
           </div>
         </div>
       </Card>
+
+      <Card>
+        <h3 className="card-title">🚶 Breaks & sitting time</h3>
+        <div className="field-block" style={{ borderTop: 0, paddingTop: 0 }}>
+          <span className="row-label">Count time away from the desk as a break, after</span>
+          <Chips options={[0, 2, 3, 5, 10]} value={s.awayBreakMin} onChange={(v) => updateSettings({ awayBreakMin: v })} format={(v) => (v === 0 ? "Off" : `${v} min`)} />
+          <span className="row-hint">
+            When your computer is idle or locked (desktop app), or Posture Guard can&apos;t see you, for this long, your quick-stretch and eye-break timers start again. No reminders while you&apos;re away.
+          </span>
+        </div>
+        <Toggle label="Track my sitting time" hint="Shows time at your desk and your longest stretch without a break on Today." on={s.sitTrackOn} onChange={(v) => updateSettings({ sitTrackOn: v })} />
+      </Card>
+
+      <Card>
+        <h3 className="card-title">📈 Check-ins & summary</h3>
+        <Toggle label="Ask how my areas feel" hint="A quick tap on a face, so Progress can show it getting better." on={s.painCheckOn} onChange={(v) => updateSettings({ painCheckOn: v })} />
+        <div className={s.painCheckOn ? "" : "dim"}>
+          <Chips
+            options={[0, 1, 3, 7]}
+            value={s.painCheckDays}
+            onChange={(v) => updateSettings({ painCheckDays: v })}
+            format={(v) => (v === 0 ? "After every session" : v === 1 ? "Once a day" : v === 7 ? "Once a week" : `Every ${v} days`)}
+          />
+        </div>
+        <Toggle label="Weekly summary" hint="On Mondays: how last week went." on={s.weeklyOn} onChange={(v) => updateSettings({ weeklyOn: v })} />
+      </Card>
+
+      {desk && (
+        <Card>
+          <h3 className="card-title">🖥️ Desktop app</h3>
+          <Toggle
+            label={/Mac/i.test(navigator.userAgent) ? "Open at login" : "Start with Windows"}
+            hint="Starts quietly as just the posture dot."
+            on={desk.openAtLogin}
+            onChange={(v) => setDeskPref({ openAtLogin: v })}
+          />
+          <Toggle label="Show the floating posture dot" hint="Posture Guard and reminders keep working when it's hidden." on={desk.showDot} onChange={(v) => setDeskPref({ showDot: v })} />
+          <span className="row-hint">Posture Guard settings (sensitivity, chime, pop-ups) are on the Guard tab.</span>
+        </Card>
+      )}
 
       <Card>
         <h3 className="card-title">🔔 Notifications on this device</h3>
@@ -270,7 +422,13 @@ export default function SettingsView({ doc, meta, config, installPrompt }: { doc
         <Toggle label="Voice coach" hint="Spoken cues so you can close your eyes" on={s.voice} onChange={(v) => updateSettings({ voice: v })} />
         <div className="field-block">
           <span className="row-label">Main routine</span>
-          <Chips options={ROUTINES.map((r) => r.id)} value={s.defaultRoutine} onChange={(v) => updateSettings({ defaultRoutine: v })} format={(id) => ROUTINES.find((r) => r.id === id)!.name} />
+          <Chips
+            options={["mix", ...ROUTINES.map((r) => r.id)]}
+            value={s.defaultRoutine}
+            onChange={(v) => updateSettings({ defaultRoutine: v })}
+            format={(id) => (id === "mix" ? "✨ My Mix" : ROUTINES.find((r) => r.id === id)!.name)}
+          />
+          <span className="row-hint">What &ldquo;Start&rdquo; and the exercise-break reminder open. My Mix is built from your areas.</span>
         </div>
       </Card>
 
@@ -376,6 +534,26 @@ export default function SettingsView({ doc, meta, config, installPrompt }: { doc
           >
             Export backup
           </button>
+          <label className="btn ghost">
+            Import backup
+            <input
+              type="file"
+              accept="application/json,.json"
+              hidden
+              onChange={async (e) => {
+                const f = e.target.files?.[0];
+                e.target.value = "";
+                if (!f) return;
+                try {
+                  const incoming = normalize(JSON.parse(await f.text()));
+                  importDoc(mergeDocs(getDoc(), incoming));
+                  flash("Backup imported and merged with what's here ✅");
+                } catch {
+                  flash("That file isn't an Upright backup.");
+                }
+              }}
+            />
+          </label>
           <button
             className="btn danger ghost"
             onClick={() => {
@@ -397,4 +575,8 @@ export default function SettingsView({ doc, meta, config, installPrompt }: { doc
       </p>
     </div>
   );
+}
+
+function fmtEvery(v: number) {
+  return v < 60 ? `${v} min` : v % 60 ? `${Math.floor(v / 60)}½ h` : `${v / 60} h`;
 }

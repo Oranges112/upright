@@ -1,12 +1,58 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { FLOOR, LEN, joints, sample, type Anim, type FrontPose, type Joints, type Key, type Pt, type SidePose } from "@/lib/gymAnim";
+import { FLOOR, LEN, joints, lerpPose, sample, type Anim, type FrontPose, type Joints, type Key, type Pt, type SidePose } from "@/lib/gymAnim";
 
 /**
  * Full-body animated figure for gym exercises.
  * Runs its own requestAnimationFrame loop, but only while it's on screen and the tab is visible.
  */
+/**
+ * A full-body figure that moves to the pose it's given (smoothly, over `speed` seconds), for desk
+ * exercises where the exercise player sets the pace.
+ */
+export function PoseFigure({ pose, scene, speed = 0.9, className }: { pose: SidePose; scene: string; speed?: number; className?: string }) {
+  const [shown, setShown] = useState(pose);
+  const from = useRef(pose);
+  const cur = useRef(pose);
+  useEffect(() => {
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    from.current = cur.current;
+    if (reduce || speed <= 0) {
+      cur.current = pose;
+      setShown(pose);
+      return;
+    }
+    const t0 = performance.now();
+    let raf = 0;
+    const step = (now: number) => {
+      const u = Math.min(1, (now - t0) / 1000 / speed);
+      const e = 0.5 - Math.cos(Math.PI * u) / 2;
+      const p = lerpPose(from.current, pose, e);
+      cur.current = p;
+      setShown(p);
+      if (u < 1) raf = requestAnimationFrame(step);
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [JSON.stringify(pose), speed]);
+  return (
+    // standing moves reach higher (arms overhead): show a little more above
+    <svg viewBox={scene === "chair" ? "0 0 260 200" : "0 -26 260 226"} className={`gym-figure ${className ?? ""}`} aria-hidden>
+      <defs>
+        <radialGradient id="gym-glow-p" cx="50%" cy="55%" r="60%">
+          <stop offset="0%" stopColor="var(--accent)" stopOpacity="0.22" />
+          <stop offset="100%" stopColor="var(--accent)" stopOpacity="0" />
+        </radialGradient>
+      </defs>
+      <ellipse cx="130" cy="110" rx="128" ry="96" fill="url(#gym-glow-p)" />
+      <line x1="6" y1={FLOOR + 1} x2="254" y2={FLOOR + 1} className="g-floor" />
+      <SideScene scene={scene} J={joints(shown)} />
+    </svg>
+  );
+}
+
 export default function GymFigure({ anim, showLabel = false, className }: { anim: Anim; showLabel?: boolean; className?: string }) {
   const host = useRef<SVGSVGElement>(null);
   const [time, setTime] = useState(0);
@@ -177,8 +223,47 @@ function Mat() {
   return <rect x={28} y={FLOOR - 3} width={210} height={4} rx={2} fill="var(--g-mat)" />;
 }
 
+function Chair() {
+  return (
+    <g>
+      <rect x={76} y={142} width={50} height={7} rx={3.5} fill="var(--g-pad)" />
+      <line x1={82} y1={149} x2={82} y2={FLOOR} stroke="var(--g-eq)" strokeWidth={5} strokeLinecap="round" />
+      <line x1={120} y1={149} x2={120} y2={FLOOR} stroke="var(--g-eq)" strokeWidth={5} strokeLinecap="round" />
+      <line x1={78} y1={146} x2={72} y2={92} stroke="var(--g-eq)" strokeWidth={6} strokeLinecap="round" />
+    </g>
+  );
+}
+
+function Desk() {
+  return (
+    <g>
+      <rect x={140} y={96} width={104} height={7} rx={3} fill="var(--g-pad)" />
+      <line x1={154} y1={103} x2={154} y2={FLOOR} stroke="var(--g-eq)" strokeWidth={5} strokeLinecap="round" />
+      <line x1={232} y1={103} x2={232} y2={FLOOR} stroke="var(--g-eq)" strokeWidth={5} strokeLinecap="round" />
+      <rect x={196} y={62} width={34} height={24} rx={3} fill="var(--g-eq)" />
+      <line x1={213} y1={86} x2={213} y2={96} stroke="var(--g-eq)" strokeWidth={4} />
+    </g>
+  );
+}
+
 function SideScene({ scene, J }: { scene: string; J: Joints }) {
   switch (scene) {
+    case "chair":
+      return (
+        <g>
+          <Chair />
+          <Body J={J} />
+        </g>
+      );
+    case "desk":
+      return (
+        <g>
+          <Desk />
+          <Body J={J} />
+        </g>
+      );
+    case "stand":
+      return <Body J={J} />;
     case "row": {
       const pulley: Pt = [214, 104];
       return (

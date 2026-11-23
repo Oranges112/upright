@@ -561,6 +561,13 @@ export interface GymPlan {
   items: PlanItem[];
 }
 
+/** Which body areas each gym plan helps (for showing only yours). */
+export const PLAN_AREAS: Record<string, import("./types").Area[]> = {
+  "gym-a": ["neck", "upper-back"],
+  "gym-b": ["upper-back", "lower-back", "hips"],
+  "gym-quick": ["neck", "upper-back"],
+};
+
 export const GYM_PLANS: GymPlan[] = [
   {
     id: "gym-a",

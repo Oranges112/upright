@@ -1,6 +1,46 @@
-import type { Exercise, Phase, Pose, Routine } from "./types";
+import type { Area, Exercise, Phase, Pose, Routine, Settings } from "./types";
+import type { SidePose } from "./gymAnim";
+import { LOWER_EXERCISES, LOWER_KIND } from "./lower";
 
-export const EXERCISES: Record<string, Exercise> = {
+/* ---------------- body areas ---------------- */
+
+export const AREAS: { id: Area; name: string; emoji: string; blurb: string }[] = [
+  { id: "neck", name: "Neck", emoji: "🦒", blurb: "Stiff neck, tech neck, headaches" },
+  { id: "upper-back", name: "Shoulders & upper back", emoji: "💪", blurb: "Rounded shoulders, tight between the blades" },
+  { id: "lower-back", name: "Lower back", emoji: "🦴", blurb: "Aches after sitting" },
+  { id: "hips", name: "Hips & glutes", emoji: "🍑", blurb: "Tight hips, numb bum" },
+  { id: "legs", name: "Legs & calves", emoji: "🦵", blurb: "Tight or achy calves, heavy legs" },
+];
+export const AREA_NAME = Object.fromEntries(AREAS.map((a) => [a.id, a.name])) as Record<Area, string>;
+
+/** Neck and upper-body exercises: which areas each helps, and a gentler swap for "This hurts". */
+const UPPER_AREAS: Record<string, Area[]> = {
+  "chin-tuck": ["neck"],
+  "side-tilt": ["neck"],
+  turn: ["neck"],
+  levator: ["neck", "upper-back"],
+  "upper-trap": ["neck", "upper-back"],
+  nod: ["neck"],
+  squeeze: ["upper-back"],
+  rolls: ["upper-back", "neck"],
+  "chest-opener": ["upper-back"],
+  "w-to-y": ["upper-back"],
+  thoracic: ["upper-back", "lower-back"],
+  "tuck-hold": ["neck"],
+};
+const UPPER_EASIER: Record<string, string> = {
+  "chin-tuck": "nod",
+  "tuck-hold": "chin-tuck",
+  "side-tilt": "rolls",
+  turn: "nod",
+  levator: "side-tilt",
+  "upper-trap": "side-tilt",
+  "chest-opener": "squeeze",
+  "w-to-y": "squeeze",
+  thoracic: "rolls",
+};
+
+const UPPER: Record<string, Exercise> = {
   "chin-tuck": {
     id: "chin-tuck",
     name: "Chin Tucks",
@@ -233,9 +273,15 @@ export const EXERCISES: Record<string, Exercise> = {
   },
 };
 
+export const EXERCISES: Record<string, Exercise> = {
+  ...Object.fromEntries(Object.entries(UPPER).map(([id, ex]) => [id, { ...ex, areas: UPPER_AREAS[id], easier: UPPER_EASIER[id] }])),
+  ...LOWER_EXERCISES,
+};
+
 export const ROUTINES: Routine[] = [
   {
     id: "quickie",
+    areas: ["neck", "upper-back"],
     name: "Desk Quickie",
     blurb: "The essentials. Fast enough for any break.",
     emoji: "⚡",
@@ -246,6 +292,7 @@ export const ROUTINES: Routine[] = [
   },
   {
     id: "stealth",
+    areas: ["neck", "upper-back"],
     name: "Stealth Mode",
     blurb: "Seated and subtle. Nobody at work will notice.",
     emoji: "🥷",
@@ -256,6 +303,7 @@ export const ROUTINES: Routine[] = [
   },
   {
     id: "reset",
+    areas: ["neck", "upper-back"],
     name: "Desk Reset",
     blurb: "A slightly deeper release for stiff afternoons.",
     emoji: "🌿",
@@ -266,6 +314,7 @@ export const ROUTINES: Routine[] = [
   },
   {
     id: "full",
+    areas: ["neck", "upper-back"],
     name: "Full Fix",
     blurb: "The complete tech-neck routine. Best done daily.",
     emoji: "🏆",
@@ -287,8 +336,119 @@ export const ROUTINES: Routine[] = [
   },
 ];
 
-export function getRoutine(id: string): Routine {
-  return ROUTINES.find((r) => r.id === id) ?? ROUTINES[0];
+ROUTINES.push(
+  {
+    id: "stretch",
+    name: "Quick Stretch",
+    blurb: "Stand up for a minute. Your whole body says thanks.",
+    emoji: "🧍",
+    standing: true,
+    exercises: ["reach-up", "calf-raise", "standing-back-extension"],
+    reps: { "calf-raise": 6, "standing-back-extension": 3 },
+    gradient: ["#fde68a", "#fb923c"],
+  },
+  {
+    id: "lower",
+    name: "Hips & Lower Back",
+    blurb: "Undo a day in the chair: hips, glutes and lower back.",
+    emoji: "🍑",
+    areas: ["hips", "lower-back"],
+    exercises: ["seated-pelvic-tilt", "glute-squeeze", "figure-4", "standing-hip-flexor", "standing-back-extension"],
+    reps: { "seated-pelvic-tilt": 4, "glute-squeeze": 6, "standing-back-extension": 3 },
+    gradient: ["#f9a8d4", "#c084fc"],
+  },
+  {
+    id: "legs",
+    name: "Legs & Calves",
+    blurb: "For tight, heavy or achy legs after sitting.",
+    emoji: "🦵",
+    areas: ["legs"],
+    exercises: ["ankle-pumps", "seated-hamstring", "calf-raise", "calf-stretch"],
+    reps: { "calf-raise": 8 },
+    gradient: ["#93c5fd", "#34d399"],
+  },
+);
+
+/** Your areas and the moves you've said hurt (Settings). */
+export type Prefs = Pick<Settings, "areas" | "skip"> & { showAll?: boolean };
+
+/** Does this routine / exercise help one of your areas? (No areas picked = everything is yours.) */
+export function forYou(areas: Area[] | undefined, mine: Area[] | undefined) {
+  if (!mine || mine.length === 0) return true;
+  if (!areas || areas.length === 0) return true; // for everyone (e.g. the quick stretch)
+  return areas.some((a) => mine.includes(a));
+}
+
+/** The best moves for each area, in the order they go into "My Mix". */
+const MIX_PICKS: Record<Area, string[]> = {
+  neck: ["chin-tuck", "side-tilt", "turn"],
+  "upper-back": ["squeeze", "chest-opener", "w-to-y"],
+  "lower-back": ["seated-pelvic-tilt", "standing-back-extension"],
+  hips: ["figure-4", "standing-hip-flexor", "glute-squeeze"],
+  legs: ["ankle-pumps", "calf-raise", "seated-hamstring"],
+};
+
+/** A short routine made from your areas: about 2 moves each, never more than 6 moves. */
+export function myMix(prefs?: Partial<Prefs>): Routine {
+  const areas = prefs?.areas?.length ? prefs.areas : (["neck", "upper-back"] as Area[]);
+  const per = areas.length >= 4 ? 1 : 2;
+  const ids: string[] = [];
+  for (const a of areas) {
+    let n = 0;
+    for (const id of MIX_PICKS[a]) {
+      const swap = resolveSkip(id, prefs?.skip);
+      if (swap && !ids.includes(swap) && n < per) {
+        ids.push(swap);
+        n++;
+      }
+    }
+  }
+  return {
+    id: "mix",
+    name: "My Mix",
+    blurb: `Made for you: ${areas.map((a) => AREA_NAME[a].toLowerCase()).join(", ")}.`,
+    emoji: "✨",
+    areas,
+    exercises: ids.slice(0, 6),
+    reps: { "chin-tuck": 6, squeeze: 6, "calf-raise": 8, "glute-squeeze": 6, "seated-pelvic-tilt": 4, "standing-back-extension": 3, turn: 2 },
+    holdSec: { "side-tilt": 15, "figure-4": 20 },
+    gradient: ["#fcd34d", "#f472b6"],
+  };
+}
+
+/** A move you said hurts is swapped for its gentler version (or left out if that hurts too). */
+export function resolveSkip(id: string, skip?: string[]): string | null {
+  let cur: string | undefined = id;
+  const seen = new Set<string>();
+  while (cur && skip?.includes(cur) && !seen.has(cur)) {
+    seen.add(cur);
+    cur = EXERCISES[cur]?.easier;
+  }
+  return cur && !skip?.includes(cur) ? cur : null;
+}
+
+/** A routine with the moves you said hurt swapped out. */
+export function withoutSkipped(r: Routine, skip?: string[]): Routine {
+  if (!skip?.length) return r;
+  const ids: string[] = [];
+  for (const id of r.exercises) {
+    const x = resolveSkip(id, skip);
+    if (x && !ids.includes(x)) ids.push(x);
+  }
+  return ids.length ? { ...r, exercises: ids } : r;
+}
+
+export function getRoutine(id: string, prefs?: Partial<Prefs>): Routine {
+  const r = id === "mix" ? myMix(prefs) : (ROUTINES.find((x) => x.id === id) ?? ROUTINES[0]);
+  return withoutSkipped(r, prefs?.skip);
+}
+
+/** Routines for your areas first (then the rest, if you want to see everything). */
+export function routinesFor(prefs: Partial<Prefs>): { mine: Routine[]; other: Routine[] } {
+  const all = [...(prefs.areas && prefs.areas.length > 0 ? [myMix(prefs)] : []), ...ROUTINES];
+  const mine = all.filter((r) => forYou(r.areas, prefs.areas)).map((r) => withoutSkipped(r, prefs.skip));
+  const other = all.filter((r) => !forYou(r.areas, prefs.areas));
+  return { mine, other };
 }
 
 export function mirrorPose(p: Pose): Pose {
@@ -318,6 +478,8 @@ export interface Step {
   side?: "left" | "right";
   /** index of exercise within routine */
   exIndex: number;
+  /** full-body pose, for exercises drawn with the full-body figure */
+  body?: SidePose;
 }
 
 export const PREP_SEC = 5;
@@ -353,6 +515,7 @@ export const KIND: Record<string, "strength" | "stretch" | "mobility"> = {
   nod: "mobility",
   rolls: "mobility",
   thoracic: "mobility",
+  ...LOWER_KIND,
 };
 
 const REST_LABELS = new Set(["Release", "Centre", "Return", "Down"]);
@@ -424,6 +587,7 @@ export function buildTimeline(routine: Routine, level: Level = 2): Step[] {
             label: ph.label,
             sec: ph.sec,
             pose: side === "right" ? mirrorPose(ph.pose) : ph.pose,
+            body: ph.body,
             rep: r,
             reps,
             side,

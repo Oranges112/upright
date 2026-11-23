@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import { Card } from "./ui";
-import { EXERCISES, ROUTINES, fmtDuration, routineSeconds } from "@/lib/exercises";
-import { GYM, GYM_PLANS, planItem, planSets, type GymExercise } from "@/lib/gym";
-import type { Exercise } from "@/lib/types";
-import { useDoc } from "@/lib/store";
+import { AREA_NAME, EXERCISES, forYou, fmtDuration, routineSeconds, routinesFor } from "@/lib/exercises";
+import { GYM, GYM_PLANS, PLAN_AREAS, planItem, planSets, type GymExercise } from "@/lib/gym";
+import type { Exercise, Routine } from "@/lib/types";
+import { updateSettings, useDoc } from "@/lib/store";
 import { DeskDetail, GymDetail, type LearnSection } from "./Learn";
 
 export default function Routines({
@@ -26,7 +26,12 @@ export default function Routines({
       return "desk";
     }
   });
-  const level = useDoc().settings.level;
+  const settings = useDoc().settings;
+  const level = settings.level;
+  const showAll = settings.showAll || settings.areas.length === 0;
+  const { mine, other } = routinesFor(settings);
+  const routines: Routine[] = showAll ? [...mine, ...other] : mine;
+  const plans = GYM_PLANS.filter((p) => showAll || forYou(PLAN_AREAS[p.id], settings.areas));
 
   function pick(w: "desk" | "gym") {
     setWhere(w);
@@ -53,9 +58,20 @@ export default function Routines({
         </button>
       </div>
 
+      {settings.areas.length > 0 && (
+        <div className="area-filter">
+          <span>
+            {showAll ? "Showing everything" : <>For your {settings.areas.map((a) => AREA_NAME[a].toLowerCase()).join(", ")}</>}
+          </span>
+          <button className="link" onClick={() => updateSettings({ showAll: !settings.showAll })}>
+            {showAll ? "Only show mine" : "Show other areas too"}
+          </button>
+        </div>
+      )}
+
       {where === "desk" && (
         <div className="routine-list">
-          {ROUTINES.map((r) => (
+          {routines.map((r) => (
             <Card key={r.id} className="routine-card" style={{ ["--g1" as string]: r.gradient[0], ["--g2" as string]: r.gradient[1] }}>
               <div className="rc-head">
                 <span className="rt-emoji big">{r.emoji}</span>
@@ -94,7 +110,8 @@ export default function Routines({
             </button>
           </p>
           <div className="routine-list">
-            {GYM_PLANS.map((p) => (
+            {plans.length === 0 && <p className="muted small">No gym plans for your areas yet. Tap &ldquo;Show other areas too&rdquo; to see them all.</p>}
+            {plans.map((p) => (
               <Card key={p.id} className="routine-card" style={{ ["--g1" as string]: p.gradient[0], ["--g2" as string]: p.gradient[1] }}>
                 <div className="rc-head">
                   <span className="rt-emoji big">{p.emoji}</span>

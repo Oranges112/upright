@@ -3507,3 +3507,256 @@ button.link {
 .desk.dot.tone-good.counting {
   opacity: 0.85;
 }
+
+/* ---------------- reminders: one banner per kind ---------------- */
+.due-banner.due-stretch {
+  background: linear-gradient(135deg, #fde68a, #fb923c);
+  box-shadow: 0 12px 36px rgba(251, 146, 60, 0.35);
+}
+.due-banner.due-eye {
+  background: linear-gradient(135deg, #c4b5fd, #93c5fd);
+  box-shadow: 0 12px 36px rgba(147, 197, 253, 0.35);
+}
+.due-banner.due-stand {
+  background: linear-gradient(135deg, #bbf7d0, #5eead4);
+}
+
+/* ---------------- first-time setup ---------------- */
+.setup-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  background: rgba(5, 8, 18, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: fadein 0.25s ease;
+}
+.setup-sheet {
+  width: 100%;
+  max-width: 560px;
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 28px;
+  padding: 24px 22px;
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.35);
+  animation: slideup 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.setup-sheet h2 {
+  font-size: 1.45rem;
+  margin: 6px 0 6px;
+}
+.setup-dots {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.setup-dots i {
+  height: 5px;
+  flex: 1;
+  border-radius: 9px;
+  background: var(--track);
+  transition: background 0.3s ease;
+}
+.setup-dots i.on {
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+}
+.setup-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 18px;
+}
+.setup-actions .btn.primary:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.area-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+.area-card {
+  position: relative;
+  text-align: left;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1.5px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 0.2s ease, transform 0.15s ease, background 0.2s ease;
+}
+.area-card:hover {
+  transform: translateY(-1px);
+}
+.area-card.on {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--card));
+}
+.area-card small {
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.3;
+}
+.area-emoji {
+  font-size: 1.6rem;
+}
+.area-tick {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--accent-ink);
+  background: var(--accent);
+  opacity: 0;
+  transform: scale(0.6);
+  transition: all 0.2s ease;
+}
+.area-card.on .area-tick {
+  opacity: 1;
+  transform: none;
+}
+.flag-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 12px 0;
+}
+.flag {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  font-size: 0.92rem;
+}
+.flag.on {
+  border-color: var(--danger);
+}
+.flag input {
+  margin-top: 3px;
+  accent-color: var(--danger);
+}
+.setup-warn {
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, transparent);
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+.feel-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+.feel-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border-radius: 16px;
+  background: var(--card);
+  border: 1px solid var(--border);
+}
+.feel-row .faces,
+.pain-card .faces {
+  display: flex;
+  gap: 4px;
+}
+.feel-row .face,
+.pain-card .face {
+  font-size: 1.4rem;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  border: 1.5px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  transition: transform 0.15s ease, background 0.2s ease;
+}
+.feel-row .face:hover,
+.pain-card .face:hover {
+  transform: scale(1.1);
+}
+.feel-row .face.on,
+.pain-card .face.on {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+/* ---------------- Today: sitting time, filters ---------------- */
+.sit-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.sit-card b {
+  display: block;
+}
+.sit-card small {
+  display: block;
+  margin-top: 2px;
+}
+.sit-icon {
+  font-size: 1.8rem;
+}
+.area-filter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin: -4px 0 14px;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
+.area-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 6px;
+}
+.area-chips .chip {
+  border: 1.5px solid var(--border);
+}
+.skip-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.skip-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.92rem;
+}
+.rem-block {
+  padding: 12px 0 4px;
+  border-top: 1px solid var(--border);
+}
+.rem-block .chips {
+  margin-top: 4px;
+}
