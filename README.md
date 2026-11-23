@@ -29,17 +29,19 @@ Nothing to install or sign up for. Open the link on your phone or computer, and 
 
 | | |
 |---|---|
-| **🏃 Guided routines** | Desk Quickie (~2 min), Stealth Mode (discreet, for the office), Desk Reset (~3 min), Full Fix (~8 min). 12 physio-style exercises: chin tucks, ear-to-shoulder, levator and upper-trap stretches, rotations, shoulder squeezes, W-to-Y, chest opener, back extension and more. |
+| **🎯 Made for what bothers you** | First-time setup asks what bothers you (neck, shoulders & upper back, lower back, hips & glutes, legs & calves), runs a quick safety check, and builds **My Mix** from your areas. You only see exercises for your areas (with a switch to see everything). |
+| **🏃 Guided routines** | Desk Quickie (~2 min), Stealth Mode (discreet, for the office), Desk Reset (~3 min), Full Fix (~8 min), Hips & Lower Back, Legs & Calves, and a 1-minute standing **Quick Stretch**. 22 physio-style exercises: chin tucks, ear-to-shoulder, shoulder squeezes, W-to-Y, chest opener, plus calf raises, ankle pumps, calf and hamstring stretches, hip flexor stretch, figure-4, glute squeezes, pelvic tilts and back bends. A **This hurts** button swaps any move for a gentler one from then on. |
 | **🎬 Exercises done with you** | An animated figure moves in sync with a countdown ring, rep dots and left/right switching. Gentle bell chimes, an optional ambient pad and voice coach. Keyboard shortcuts and screen wake-lock. |
 | **🏋️ Gym workouts** | Three posture plans (Upper back, Back + core & hips, Quick 20) with 12 animated gym moves: rows, face pulls, pulldowns, Y-raises, head lifts, glute bridges, dead bugs and stretches. Tap "Set done" for a rest timer, timed holds for stretches, and remembered weights. |
 | **📚 Learn** | Read about any exercise without doing it: how to do it, why it helps, where to feel it, common mistakes, easier and harder versions. Plus short guides on desk setup, phone posture, sleep, standing posture, gym rules, timelines and when to see a physio. |
 | **💪 Intensity levels** | Gentle → Athlete. Strength moves get longer holds and more reps, stretches stay capped at a safe 30 s, and mobility moves stay easy. After each session it asks "Too easy / Just right / Too hard" and adjusts. |
-| **🔔 Reminders** | Set the interval, active hours and days, with push notifications that have **Start now** and **Snooze** buttons. They work with the app closed, on phone and desktop. |
+| **🔔 Reminders** | Exercise breaks, a **quick stretch** (stand up and move, hourly by default), 20-20-20 **eye breaks** and **standing-desk** switches. Each has its own on/off switch and interval, inside your active hours and days, with your choice of snooze length and chime. Time away from the desk (computer idle or locked, or Posture Guard can't see you) counts as a break, and there's a daily **sitting time** count. Only one window gives reminders, however many are open. |
 | **🛡️ Posture Guard** | Your webcam spots a forward head, slumping, chin dropping and head tilt, then nudges you with a chime and notification. It keeps checking while you look at a second screen or turn away, and tells you to recalibrate if your laptop or camera moves. Runs **100% on-device** (MediaPipe); no video ever leaves your computer. |
 | **🪟 Floating widget** | A tiny always-on-top pill shows your posture live over any app, with what you're doing wrong and how to fix it (Chrome/Edge desktop). |
 | **📈 Progress** | Streaks, XP and levels, a posture score, heatmap, weekly practice vs. neck-comfort chart, plus three self-tests: neck endurance hold, wall test, and a **side-profile photo** that finds your ear and shoulder automatically, measures your forward-head angle and checks your back, hips and knees. A **before/after slider** lines up your photos so you can see the change, with a monthly reminder to retake it. |
 | **📄 Before & after report** | Compares your first week with the last 7 days, with photos side by side. Print or save as PDF. |
-| **🔄 Sync without accounts** | Link your phone and computer with a private code; streaks merge automatically. Photos stay on the device. |
+| **📈 How it feels** | Tap a face for each of your areas (after a session or once a day/week, your choice) and Progress shows each one's trend. A Monday summary looks back at your week. |
+| **🔄 Sync without accounts** | Scan a QR code with your phone to link it to your computer; streaks, sessions and settings merge automatically. Photos stay on the device. |
 | **🌙 Dark mode, offline, installable** | A PWA that works offline and installs from the browser. |
 
 ## 🪟 Desktop widget (Windows and Mac)
@@ -96,7 +98,10 @@ Something needs to ping `/api/cron` every 5 minutes (Vercel's free plan only all
 - **Computer (Chrome/Edge):** install icon in the address bar → Settings → **Turn on notifications**.
 - **Android:** Chrome menu → **Install app**.
 - **iPhone:** Safari → Share → **Add to Home Screen**, then open it from the Home Screen and turn on notifications (iOS 16.4+).
-- **Link devices:** Settings → Your devices → **Share link**, and open it on the other device.
+- **Link devices:** Settings → Phone & computer → scan the QR code with your phone's camera.
+
+### 7. (Optional) Let the free GitHub Pages copy and the desktop app sync too
+The desktop app loads the GitHub Pages copy. To give it (and anyone using that copy) sync and background reminders through your Vercel server: GitHub repo → **Settings → Secrets and variables → Actions → Variables → New repository variable**, name `UPRIGHT_API_URL`, value your Vercel address (e.g. `https://your-app.vercel.app`). The next GitHub Pages deploy picks it up.
 
 ## Run locally
 

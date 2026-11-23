@@ -5,13 +5,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Figure from "./Figure";
 import { PoseFigure } from "./GymFigure";
 import Ring from "./Ring";
-import { EXERCISES, LEVEL_INFO, buildTimeline, fmtClock, type Level, type Step } from "@/lib/exercises";
+import { AREA_NAME, EXERCISES, LEVEL_INFO, buildTimeline, fmtClock, resolveSkip, type Level, type Step } from "@/lib/exercises";
+import type { Area } from "@/lib/types";
 import type { Routine } from "@/lib/types";
 import { COACHING, workTips } from "@/lib/coaching";
 import { Mirror, useFormCheck } from "./FormCheck";
 
 import { sound, speak, stopSpeaking } from "@/lib/sound";
-import { addCheckin, getDoc, logSession, updateSettings } from "@/lib/store";
+import { addCheckin, getDoc, getMeta, logSession, setMeta, updateSettings } from "@/lib/store";
 import { currentStreak, levelFor, todayKey, totalXp } from "@/lib/stats";
 
 interface Props {
@@ -35,6 +36,7 @@ export default function Player({ routine, onClose }: Props) {
   const [confirmExit, setConfirmExit] = useState(false);
   const [demoFlip, setDemoFlip] = useState(false);
   const [tipBump, setTipBump] = useState(0);
+  const [hurtMsg, setHurtMsg] = useState<string | null>(null);
 
   const startedAt = useRef(Date.now());
   useEffect(signalExercising, []);
@@ -262,6 +264,21 @@ export default function Player({ routine, onClose }: Props) {
     goTo(target);
   }
 
+  /** "This hurts": never offer this move again (a gentler one takes its place) and move on. */
+  function itHurts() {
+    const cur = steps[idxRef.current];
+    if (!cur) return;
+    const id = cur.exerciseId;
+    const skip = [...new Set([...(getDoc().settings.skip ?? []), id])];
+    updateSettings({ skip });
+    const swap = resolveSkip(id, skip);
+    setHurtMsg(
+      swap ? `Skipped. Next time you'll get ${EXERCISES[swap].name} instead. Stop anything that hurts.` : "Skipped. We won't give you this one again. Stop anything that hurts.",
+    );
+    setTimeout(() => setHurtMsg(null), 6000);
+    skipExercise(1);
+  }
+
   function toggleMute() {
     const m = !muted;
     setMuted(m);
@@ -433,7 +450,13 @@ export default function Player({ routine, onClose }: Props) {
           <svg viewBox="0 0 24 24" width="26" height="26"><path d="M17 6v12M5 6l9 6-9 6z" fill="currentColor" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" /></svg>
         </button>
       </footer>
-      <div className="up-next">{nextEx ? <>Up next · <b>{nextEx.name}</b></> : <>Last one. Finish strong 💪</>}</div>
+      <div className="up-next">
+        {nextEx ? <>Up next · <b>{nextEx.name}</b></> : <>Last one. Finish strong 💪</>}
+        <button className="hurt-btn" onClick={itHurts} title="Skip this move and swap it for a gentler one from now on">
+          😣 This hurts
+        </button>
+      </div>
+      {hurtMsg && <div className="toast hurt-toast">{hurtMsg}</div>}
 
       {paused && !confirmExit && (
         <div className="paused-veil" onClick={() => togglePause(false)}>
@@ -489,7 +512,16 @@ function Finish({
   result: FinishResult;
   onClose: () => void;
 }) {
-  const [picked, setPicked] = useState<number | null>(null);
+  // which areas to ask about: this routine's areas that you picked (or the neck, for old routines)
+  const [askAreas] = useState<Area[]>(() => {
+    const s = getDoc().settings;
+    if (!s.painCheckOn) return [];
+    const last = getMeta().lastPainCheckAt ?? 0;
+    if (s.painCheckDays > 0 && Date.now() - last < s.painCheckDays * 86_400_000 - 3600_000) return [];
+    const r = (routine.areas ?? ["neck"]).filter((a) => s.areas.length === 0 || s.areas.includes(a));
+    return (r.length ? r : (routine.areas ?? ["neck"])).slice(0, 3);
+  });
+  const [picks, setPicks] = useState<Partial<Record<Area, number>>>({});
   const confetti = useMemo(
     () =>
       Array.from({ length: 36 }).map((_, i) => ({
@@ -502,10 +534,11 @@ function Finish({
     [routine.gradient],
   );
 
-  function pick(level: number) {
-    setPicked(level);
+  function pick(area: Area, level: number) {
+    setPicks((x) => ({ ...x, [area]: level }));
     // map 5 faces to 0-10 stiffness scale
-    addCheckin([0, 2, 5, 7, 9][level]);
+    addCheckin([0, 2, 5, 7, 9][level], area);
+    setMeta({ lastPainCheckAt: Date.now() });
   }
 
   return (
@@ -553,21 +586,23 @@ function Finish({
           </p>
         )}
 
-        <div className="feel">
-          <p>How does your neck feel right now?</p>
-          <div className="feel-row">
-            {FEEL.map((f, i) => (
-              <button key={f} className={`feel-btn ${picked === i ? "on" : ""}`} onClick={() => pick(i)} disabled={picked !== null}>
-                {f}
-              </button>
-            ))}
+        {askAreas.map((area) => (
+          <div className="feel" key={area}>
+            <p>How does your {AREA_NAME[area].toLowerCase()} feel right now?</p>
+            <div className="feel-row">
+              {FEEL.map((f, i) => (
+                <button key={f} className={`feel-btn ${picks[area] === i ? "on" : ""}`} onClick={() => pick(area, i)} disabled={picks[area] != null}>
+                  {f}
+                </button>
+              ))}
+            </div>
+            <div className="feel-scale">
+              <span>Great</span>
+              <span>Stiff / sore</span>
+            </div>
+            {picks[area] != null && <p className="tiny muted">Logged. This feeds your progress chart.</p>}
           </div>
-          <div className="feel-scale">
-            <span>Great</span>
-            <span>Stiff / sore</span>
-          </div>
-          {picked !== null && <p className="tiny muted">Logged. This feeds your progress chart.</p>}
-        </div>
+        ))}
 
         <Effort />
 

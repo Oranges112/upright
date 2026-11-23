@@ -1,6 +1,6 @@
 "use client";
 
-import { asset } from "./base";
+import { API, asset } from "./base";
 import { appBridge, desktopBridge } from "./desktop";
 import { getMeta } from "./store";
 
@@ -56,6 +56,7 @@ export async function notify(o: NotifyOptions): Promise<boolean> {
         kind: o.kind,
         url: reminder ? asset(`/?start=${encodeURIComponent(o.routine ?? (o.kind === "stretch" ? "stretch" : "default"))}`) : asset("/"),
         code: getMeta().code,
+        api: API,
       },
       ...(reminder
         ? {

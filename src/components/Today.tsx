@@ -11,6 +11,7 @@ import { addDays, countsByDay, currentStreak, levelFor, totalXp, weekdayOf } fro
 import { nextReminderAt } from "@/lib/schedule";
 import { lastSessionEnd, type Meta } from "@/lib/store";
 import PhotoReminder from "./PhotoReminder";
+import { CheckInCard, WeekCard } from "./TodayCards";
 
 const DAY_LETTERS = ["S", "M", "T", "W", "T", "F", "S"];
 
@@ -149,6 +150,9 @@ export default function Today({
       </Card>
 
       {setupCard}
+
+      <WeekCard doc={doc} meta={meta} today={today} />
+      <CheckInCard doc={doc} meta={meta} />
 
       {s.sitTrackOn && sitSec >= 60 && (
         <Card className="sit-card">

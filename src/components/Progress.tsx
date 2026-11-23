@@ -10,6 +10,7 @@ import { sound } from "@/lib/sound";
 import PhotoTest from "./PhotoTest";
 import PhotoCompare from "./PhotoCompare";
 import Report from "./Report";
+import AreaFeel from "./AreaFeel";
 
 export default function Progress({ doc, today }: { doc: Doc; today: string }) {
   const [test, setTest] = useState<TestType | null>(null);
@@ -46,6 +47,8 @@ export default function Progress({ doc, today }: { doc: Doc; today: string }) {
           </p>
         </div>
       </Card>
+
+      <AreaFeel doc={doc} />
 
       <button className="report-cta" onClick={() => setReport(true)}>
         <span className="rc-icon">📄</span>

@@ -150,7 +150,7 @@ export default function Setup({ onDone }: { onDone: (startFirst: boolean) => voi
               {areas.map((a) => {
                 const info = AREAS.find((x) => x.id === a)!;
                 return (
-                  <div key={a} className="feel-row">
+                  <div key={a} className="feel-line">
                     <span>
                       {info.emoji} {info.name}
                     </span>

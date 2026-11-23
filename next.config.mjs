@@ -22,6 +22,16 @@ const nextConfig = {
     : {
         async headers() {
           return [
+            // the GitHub Pages copy and the desktop app sync through this server
+            {
+              source: "/api/:path*",
+              headers: [
+                { key: "Access-Control-Allow-Origin", value: "*" },
+                { key: "Access-Control-Allow-Methods", value: "GET, POST, OPTIONS" },
+                { key: "Access-Control-Allow-Headers", value: "content-type, authorization" },
+                { key: "Access-Control-Max-Age", value: "86400" },
+              ],
+            },
             {
               source: "/sw.js",
               headers: [

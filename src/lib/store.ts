@@ -4,7 +4,7 @@ import { useSyncExternalStore } from "react";
 import type { Area, CheckIn, Doc, GuardDay, PostureTest, SessionLog, Settings, TestType } from "./types";
 import { emptyDoc, mergeDocs, normalize } from "./merge";
 import { dayKey } from "./schedule";
-import { STATIC } from "./base";
+import { API, STATIC, api } from "./base";
 
 const KEY = "upright:v1";
 const META_KEY = "upright:meta";
@@ -301,7 +301,7 @@ export async function snooze(minutes: number) {
   const m = getMeta();
   if (config?.sync && m.code) {
     try {
-      await fetch("/api/snooze", {
+      await fetch(api("/api/snooze"), {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ code: m.code, minutes }),
@@ -358,7 +358,7 @@ export async function syncNow(): Promise<void> {
   }
   syncing = true;
   try {
-    const res = await fetch("/api/sync", {
+    const res = await fetch(api("/api/sync"), {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ code, doc: getDoc() }),
@@ -384,8 +384,8 @@ export async function initStore() {
   getDoc();
   getMeta();
   try {
-    if (STATIC) throw new Error("no server in the static build");
-    const res = await fetch("/api/config", { cache: "no-store" });
+    if (STATIC && !API) throw new Error("no server in the static build");
+    const res = await fetch(api("/api/config"), { cache: "no-store" });
     config = res.ok ? ((await res.json()) as ServerConfig) : { sync: false, push: false };
   } catch {
     config = { sync: false, push: false };

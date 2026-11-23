@@ -40,6 +40,9 @@ jobs:
         env:
           GITHUB_PAGES: "1"
           PAGES_BASE_PATH: /${{ github.event.repository.name }}
+          # set the repository variable UPRIGHT_API_URL to your Vercel address to turn on
+          # phone <-> computer sync and background reminders for this copy too
+          NEXT_PUBLIC_API_URL: ${{ vars.UPRIGHT_API_URL }}
 
       - run: touch out/.nojekyll
 

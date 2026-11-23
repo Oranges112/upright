@@ -96,7 +96,7 @@ self.addEventListener("notificationclick", (event) => {
         const all = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
         all.forEach((c) => c.postMessage({ type: "snooze", kind: data.kind || "break" }));
         if (data.code && (!data.kind || data.kind === "break")) {
-          await fetch(`${BASE}/api/snooze`, {
+          await fetch(`${data.api || BASE}/api/snooze`, {
             method: "POST",
             headers: { "content-type": "application/json" },
             body: JSON.stringify({ code: data.code, minutes: 30 }),

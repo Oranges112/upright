@@ -3,6 +3,7 @@
 import DesktopDownload from "./DesktopDownload";
 import DesktopUpdates from "./DesktopUpdates";
 import NotifCheck from "./NotifCheck";
+import PhoneLink from "./PhoneLink";
 import { useEffect, useState } from "react";
 import { Card, Chips, Toggle, hourLabel } from "./ui";
 import { AREAS, EXERCISES, LEVEL_INFO, ROUTINES, buildTimeline, getRoutine, myMix, type Level } from "@/lib/exercises";
@@ -432,68 +433,7 @@ export default function SettingsView({
         </div>
       </Card>
 
-      <Card>
-        <h3 className="card-title">📱 Your devices</h3>
-        {config?.sync ? (
-          <>
-            <p className="muted small">Your streaks and progress sync between your phone and computer. Open this link on your other device to connect it:</p>
-            <div className="code-box">
-              <code>{prettyCode(meta.code) || "Setting up…"}</code>
-              <button
-                className="btn ghost"
-                disabled={!link}
-                onClick={async () => {
-                  try {
-                    if (navigator.share) await navigator.share({ title: "Upright", text: "Link my Upright", url: link });
-                    else {
-                      await navigator.clipboard.writeText(link);
-                      flash("Link copied. Open it on your other device.");
-                    }
-                  } catch {}
-                }}
-              >
-                Share link
-              </button>
-            </div>
-            <p className="row-hint">Keep this code private. Anyone with it can see your progress.</p>
-            <div className="link-row">
-              <input placeholder="Or enter a code from your other device" value={linkInput} onChange={(e) => setLinkInput(e.target.value)} />
-              <button
-                className="btn primary"
-                onClick={async () => {
-                  const c = cleanCode(linkInput);
-                  if (!c) return flash("That code doesn't look right (16 characters).");
-                  await linkDevice(c);
-                  setLinkInput("");
-                  flash("Linked! Your data is merged and synced.");
-                }}
-              >
-                Link
-              </button>
-            </div>
-            {meta.syncError ? (
-              <p className="row-hint warn">Sync issue: {meta.syncError}</p>
-            ) : meta.lastSyncAt ? (
-              <p className="row-hint">Last synced {new Date(meta.lastSyncAt).toLocaleTimeString()}</p>
-            ) : null}
-          </>
-        ) : (
-          <p className="muted small">
-            {STATIC ? (
-              <>
-                Your progress is saved privately in this browser on this device. Nothing is sent anywhere. Use <b>Export backup</b> below to keep a
-                copy. Want phone and computer to share progress?{" "}
-                <a href="https://github.com/Oranges112/upright#host-your-own-copy-about-10-minutes-free-tiers" target="_blank" rel="noreferrer">
-                  Host your own copy
-                </a>
-                .
-              </>
-            ) : (
-              "Sync isn't configured on this server yet, so data stays on this device. See the README to switch on Upstash."
-            )}
-          </p>
-        )}
-      </Card>
+      <PhoneLink meta={meta} config={config} flash={flash} />
 
       <Card>
         <h3 className="card-title">📲 Install the app</h3>

@@ -1,7 +1,7 @@
 "use client";
 
 import { getMeta, setMeta } from "./store";
-import { asset } from "./base";
+import { api, asset } from "./base";
 
 export async function registerSW(): Promise<ServiceWorkerRegistration | null> {
   if (typeof window === "undefined" || !("serviceWorker" in navigator)) return null;
@@ -62,7 +62,7 @@ export async function enablePush(vapidPublicKey: string): Promise<{ ok: boolean;
       });
     }
     const code = getMeta().code;
-    const res = await fetch("/api/push/subscribe", {
+    const res = await fetch(api("/api/push/subscribe"), {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ code, subscription: sub.toJSON() }),
@@ -79,7 +79,7 @@ export async function disablePush() {
   const reg = await navigator.serviceWorker.getRegistration();
   const sub = await reg?.pushManager.getSubscription();
   if (sub) {
-    await fetch("/api/push/unsubscribe", {
+    await fetch(api("/api/push/unsubscribe"), {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ code: getMeta().code, endpoint: sub.endpoint }),
@@ -90,7 +90,7 @@ export async function disablePush() {
 }
 
 export async function sendTestPush() {
-  const res = await fetch("/api/push/test", {
+  const res = await fetch(api("/api/push/test"), {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ code: getMeta().code }),
@@ -127,7 +127,7 @@ export async function pushStatus(): Promise<{ subscribed: boolean; known: boolea
   try {
     const reg = await navigator.serviceWorker.getRegistration();
     const sub = await reg?.pushManager?.getSubscription();
-    const res = await fetch("/api/push/status", {
+    const res = await fetch(api("/api/push/status"), {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ code: getMeta().code, endpoint: sub?.endpoint ?? "" }),
