@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { Card } from "./ui";
-import { AREAS } from "@/lib/exercises";
-import { addCheckin, setMeta, type Meta } from "@/lib/store";
+import { AREAS, PLAN_WEEKS, fmtDuration, getRoutine, planWeek, prefsOf, routineSeconds } from "@/lib/exercises";
+import { addCheckin, setMeta, updateSettings, type Meta } from "@/lib/store";
 import { addDays, weekdayOf } from "@/lib/stats";
 import type { Area, Doc } from "@/lib/types";
 
@@ -122,6 +122,56 @@ export function WeekCard({ doc, meta, today }: { doc: Doc; meta: Meta; today: st
       <button className="link" onClick={() => setMeta({ weeklySeen: monday })}>
         Got it
       </button>
+    </Card>
+  );
+}
+
+/** The 4-week plan: start it, or see this week's goal and today's session. */
+export function PlanCard({ doc, today, onStart }: { doc: Doc; today: string; onStart: (id: string) => void }) {
+  const s = doc.settings;
+  const week = planWeek(s, today);
+  if (!s.planOn || !s.planStart) {
+    if (doc.sessions.length === 0 && !s.areas.length) return null;
+    return (
+      <Card className="plan-card">
+        <h3 className="card-title">🗓️ Try the 4-week plan</h3>
+        <p className="muted small">A session a day, built from your areas. It starts gentle and gets stronger each week, so you can feel the difference by week 4.</p>
+        <div className="btn-row">
+          <button className="btn primary" onClick={() => updateSettings({ planOn: true, planStart: today, defaultRoutine: "plan" })}>
+            Start my plan
+          </button>
+        </div>
+      </Card>
+    );
+  }
+  // this plan week (after week 4: the last 7 days)
+  const from = week >= 5 ? addDays(today, -6) : addDays(s.planStart, (week - 1) * 7);
+  const done = new Set(doc.sessions.filter((x) => x.completed && x.day >= from && x.day < addDays(from, 7)).map((x) => x.day)).size;
+  const r = getRoutine("plan", prefsOf(doc));
+  const info = PLAN_WEEKS[Math.min(4, week) - 1];
+  const doneToday = doc.sessions.some((x) => x.completed && x.day === today && x.routineId === "plan");
+  return (
+    <Card className="plan-card">
+      <div className="plan-top">
+        <div>
+          <p className="eyebrow">{week >= 5 ? "Plan complete 🎉" : `Your plan · week ${week} of 4`}</p>
+          <h3>{week >= 5 ? "Keep it going" : info.title.split(": ")[1]}</h3>
+        </div>
+        <div className="plan-weeks" aria-hidden>
+          {[1, 2, 3, 4].map((w) => (
+            <i key={w} className={w < week ? "done" : w === week ? "now" : ""} />
+          ))}
+        </div>
+      </div>
+      <p className="muted small">{week >= 5 ? "You finished the 4 weeks. Today's session uses your strongest version." : info.blurb}</p>
+      <p className="small">
+        This week: <b>{Math.min(done, s.planPerWeek)}</b> of {s.planPerWeek} days{done >= s.planPerWeek ? " ✅" : ""}
+      </p>
+      <div className="btn-row">
+        <button className="btn primary" onClick={() => onStart("plan")}>
+          {doneToday ? "▶ Do it again" : "▶ Today's session"} <em>{fmtDuration(routineSeconds(r, r.level))}</em>
+        </button>
+      </div>
     </Card>
   );
 }

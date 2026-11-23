@@ -22,6 +22,7 @@ import { sound } from "./sound";
 import { detectFace, getFaceDetector, measureFace, median, openCamera, type Sample } from "./face";
 import { notify } from "./notify";
 import { onBus, pageId, post } from "./bus";
+import { quietReason } from "./quiet";
 
 export type GuardStatus =
   | "off"
@@ -71,6 +72,29 @@ export interface GuardState {
   exercising?: boolean;
   /** this is what another window (e.g. the desktop dot) sees, not this window's own camera */
   remote?: boolean;
+  /** learning your good posture by itself: 0..1 (only while uncalibrated, with auto-calibrate on) */
+  learning?: number;
+  /** the current calibration was made automatically */
+  autoCalibrated?: boolean;
+}
+
+/** Auto-calibration: watch this many samples (~2 per second) before picking your best posture. */
+const AUTO_SAMPLES = 40;
+/** Recalibrate by itself after the camera has looked "moved" for this long. */
+const AUTO_MOVED_SEC = 45;
+
+/**
+ * Pick "sitting tall" from a stretch of normal sitting: the moments you were furthest back from
+ * the screen (smallest face) and highest in the frame. Pure, so it's easy to test.
+ */
+export function pickBest(samples: Sample[]): Sample[] {
+  const facing = samples.filter((x) => x.yaw == null || Math.abs(x.yaw) < 0.25);
+  const pool = facing.length >= 10 ? facing : samples;
+  const q = (xs: number[], p: number) => [...xs].sort((a, b) => a - b)[Math.min(xs.length - 1, Math.floor(xs.length * p))];
+  const wCut = q(pool.map((x) => x.w), 0.4);
+  const cyCut = q(pool.map((x) => x.cy), 0.5);
+  const best = pool.filter((x) => x.w <= wCut && x.cy <= cyCut);
+  return best.length >= 5 ? best : pool.filter((x) => x.w <= wCut);
 }
 
 /**
@@ -234,6 +258,7 @@ class GuardEngine {
   private movedFor = 0;
   private stuckFor = 0;
   private calibrating = false;
+  private autoSamples: Sample[] = [];
   private pending = { good: 0, total: 0, nudges: 0 };
   private lastFlush = 0;
 
@@ -337,7 +362,7 @@ class GuardEngine {
     sound.next();
   }
 
-  private finishCalibration() {
+  private finishCalibration(auto = false) {
     this.calibrating = false;
     if (this.samples.length < 3) {
       this.set({ status: "uncalibrated", calibrateLeft: 0 });
@@ -358,11 +383,13 @@ class GuardEngine {
       pitchM: med("pitchM"),
       edm: med("edm"),
       at: Date.now(),
+      ...(auto ? { auto: true } : {}),
     };
     setMeta({ guardBase: b });
     this.recent = [];
-    this.set({ status: "good", calibrateLeft: 0, badFor: 0, oldCalibration: false, moved: false });
-    sound.complete();
+    this.autoSamples = [];
+    this.set({ status: "good", calibrateLeft: 0, badFor: 0, oldCalibration: false, moved: false, learning: undefined, autoCalibrated: auto });
+    if (!auto) sound.complete();
   }
 
   private paused = false;
@@ -409,7 +436,18 @@ class GuardEngine {
     const meta = getMeta();
     const base = meta.guardBase;
     if (!base) {
-      this.set({ w: sw, cy: scy, status: "uncalibrated" });
+      // learn your good posture by itself (unless you'd rather tap Calibrate)
+      if (meta.autoCalibrate !== false) {
+        this.autoSamples.push(smp);
+        if (this.autoSamples.length >= AUTO_SAMPLES) {
+          this.samples = pickBest(this.autoSamples);
+          this.finishCalibration(true);
+          return;
+        }
+        this.set({ w: sw, cy: scy, status: "uncalibrated", learning: this.autoSamples.length / AUTO_SAMPLES });
+        return;
+      }
+      this.set({ w: sw, cy: scy, status: "uncalibrated", learning: undefined });
       return;
     }
 
@@ -425,6 +463,14 @@ class GuardEngine {
     // (laptop raised or moved, lid tilted back, chair moved). Don't nag about posture then.
     this.movedFor = a.movedNow && !a.away ? this.movedFor + dt : 0;
     const moved = this.movedFor > MOVED_SEC;
+    // the camera moved: with auto-calibrate on, just learn the new position
+    if (this.movedFor > AUTO_MOVED_SEC && meta.autoCalibrate !== false) {
+      this.movedFor = 0;
+      this.autoSamples = [];
+      setMeta({ guardBase: undefined });
+      this.set({ status: "uncalibrated", moved: false, learning: 0 });
+      return;
+    }
     // Raising the laptop (or tilting the screen back) without recalibrating looks like sinking or
     // a dropped chin that never lets up. Real slouches come and go, so ask after a couple of minutes.
     this.stuckFor = (worst === "low" || worst === "down") && score > STUCK_SCORE && !a.turned && !a.away ? this.stuckFor + dt : 0;
@@ -447,7 +493,8 @@ class GuardEngine {
       } else {
         badFor += dt;
         const delay = getMeta().guardDelaySec ?? 30;
-        if (badFor >= delay && Date.now() - this.lastNudge > 90_000) {
+        // (during quiet times posture is still measured, just no interruptions)
+        if (badFor >= delay && Date.now() - this.lastNudge > 90_000 && !quietReason()) {
           this.lastNudge = Date.now();
           sessionNudges++;
           this.pending.nudges++;
@@ -469,6 +516,7 @@ class GuardEngine {
       turned: (a.turned || a.away) && status !== "moved",
       maybeMoved: this.stuckFor > STUCK_SEC,
       moved,
+      autoCalibrated: !!base.auto,
     });
     if (Date.now() - this.lastFlush > 60_000) this.flush();
   }

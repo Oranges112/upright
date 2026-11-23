@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Ring from "./Ring";
 import { Card } from "./ui";
-import { fmtDuration, getRoutine, routineSeconds, routinesFor } from "@/lib/exercises";
+import { fmtDuration, getRoutine, prefsOf, routineSeconds, routinesFor } from "@/lib/exercises";
 import { nextIntervalAt } from "@/lib/schedule";
 import { eyeReminder, standReminder, stretchReminder } from "@/lib/reminders";
 import type { Doc } from "@/lib/types";
@@ -11,7 +11,9 @@ import { addDays, countsByDay, currentStreak, levelFor, totalXp, weekdayOf } fro
 import { nextReminderAt } from "@/lib/schedule";
 import { lastSessionEnd, type Meta } from "@/lib/store";
 import PhotoReminder from "./PhotoReminder";
-import { CheckInCard, WeekCard } from "./TodayCards";
+import { CheckInCard, PlanCard, WeekCard } from "./TodayCards";
+import { PhoneCard } from "./PhonePosture";
+import { quietFor, quietReason } from "@/lib/quiet";
 
 const DAY_LETTERS = ["S", "M", "T", "W", "T", "F", "S"];
 
@@ -60,8 +62,8 @@ export default function Today({
   const streak = currentStreak(doc, today);
   const lvl = levelFor(totalXp(doc));
   const s = doc.settings;
-  const main = getRoutine(s.defaultRoutine, s);
-  const quick = routinesFor(s).mine;
+  const main = getRoutine(s.defaultRoutine, prefsOf(doc));
+  const quick = routinesFor(prefsOf(doc)).mine;
   const next = nextReminderAt(
     doc.settings,
     { lastSessionAt: lastSessionEnd(doc), lastReminderAt: meta.lastReminderAt, snoozeUntil: meta.snoozeUntil },
@@ -146,11 +148,22 @@ export default function Today({
             )}
             {meta.snoozeUntil && meta.snoozeUntil > now && <> · snoozed</>}
           </button>
+          {anyOn &&
+            (quietReason(now) ? (
+              <button className="reminder-line" onClick={() => quietFor(null)}>
+                🔕 Quiet {meta.quietUntil && meta.quietUntil > now ? `until ${new Date(meta.quietUntil).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}` : `(${quietReason(now)})`} · tap to end
+              </button>
+            ) : (
+              <button className="reminder-line subtle" onClick={() => quietFor(60)}>
+                🔕 In a meeting? Quiet for 1 hour
+              </button>
+            ))}
         </div>
       </Card>
 
       {setupCard}
 
+      <PlanCard doc={doc} today={today} onStart={onStart} />
       <WeekCard doc={doc} meta={meta} today={today} />
       <CheckInCard doc={doc} meta={meta} />
 
@@ -168,6 +181,7 @@ export default function Today({
       )}
 
       <PhotoReminder doc={doc} />
+      <PhoneCard />
 
       <div className="week-strip">
         {week.map((d) => {

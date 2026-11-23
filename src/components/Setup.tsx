@@ -43,6 +43,7 @@ export default function Setup({ onDone }: { onDone: (startFirst: boolean) => voi
   const [endHour, setEndHour] = useState(s.endHour);
   const [perm, setPerm] = useState<string>("default");
   const [desk, setDesk] = useState<DesktopPrefs | null>(null);
+  const [plan4, setPlan4] = useState(true);
 
   useEffect(() => {
     setPerm(notificationsSupported() ? Notification.permission : "unsupported");
@@ -58,9 +59,12 @@ export default function Setup({ onDone }: { onDone: (startFirst: boolean) => voi
   function finish(startFirst: boolean) {
     const upperOnly = areas.length > 0 && areas.every((a) => a === "neck" || a === "upper-back");
     const now = Date.now();
+    const today = new Date().toISOString().slice(0, 10);
     updateSettings({
       areas,
-      defaultRoutine: areas.length === 0 || upperOnly ? (s.defaultRoutine === "mix" ? "quickie" : s.defaultRoutine) : "mix",
+      ...(plan4 && areas.length ? { planOn: true, planStart: s.planOn && s.planStart ? s.planStart : today } : {}),
+      defaultRoutine:
+        plan4 && areas.length ? "plan" : areas.length === 0 || upperOnly ? (s.defaultRoutine === "mix" ? "quickie" : s.defaultRoutine) : "mix",
       remindersOn: breakMin > 0,
       intervalMin: breakMin || s.intervalMin,
       stretchOn: stretchMin > 0,
@@ -231,6 +235,12 @@ export default function Setup({ onDone }: { onDone: (startFirst: boolean) => voi
               Your plan: <b>{plan.name}</b>, {plan.exercises.length} moves for {areas.length === 0 ? "everything" : areas.map((a) => AREAS.find((x) => x.id === a)!.name.toLowerCase()).join(", ")}.
               {flags.length > 0 && " Remember: get checked before doing the exercises."}
             </p>
+            <Toggle
+              label="🗓️ Follow the 4-week plan"
+              hint="A session a day from your areas: gentle in week 1, stronger each week."
+              on={plan4}
+              onChange={setPlan4}
+            />
             {perm !== "granted" && perm !== "unsupported" && !desk && (
               <button
                 className="btn ghost wide"

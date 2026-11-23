@@ -2,11 +2,12 @@
 
 import { useState } from "react";
 import { Card } from "./ui";
-import { AREA_NAME, EXERCISES, forYou, fmtDuration, routineSeconds, routinesFor } from "@/lib/exercises";
+import { AREA_NAME, EXERCISES, forYou, fmtDuration, prefsOf, routineSeconds, routinesFor } from "@/lib/exercises";
 import { GYM, GYM_PLANS, PLAN_AREAS, planItem, planSets, type GymExercise } from "@/lib/gym";
 import type { Exercise, Routine } from "@/lib/types";
 import { updateSettings, useDoc } from "@/lib/store";
 import { DeskDetail, GymDetail, type LearnSection } from "./Learn";
+import RoutineBuilder from "./RoutineBuilder";
 
 export default function Routines({
   onStart,
@@ -19,6 +20,7 @@ export default function Routines({
 }) {
   const [openEx, setOpenEx] = useState<Exercise | null>(null);
   const [openGym, setOpenGym] = useState<GymExercise | null>(null);
+  const [builder, setBuilder] = useState<Routine | "new" | null>(null);
   const [where, setWhere] = useState<"desk" | "gym">(() => {
     try {
       return localStorage.getItem("upright:routines-where") === "gym" ? "gym" : "desk";
@@ -26,10 +28,11 @@ export default function Routines({
       return "desk";
     }
   });
-  const settings = useDoc().settings;
+  const doc = useDoc();
+  const settings = doc.settings;
   const level = settings.level;
   const showAll = settings.showAll || settings.areas.length === 0;
-  const { mine, other } = routinesFor(settings);
+  const { mine, other } = routinesFor(prefsOf(doc));
   const routines: Routine[] = showAll ? [...mine, ...other] : mine;
   const plans = GYM_PLANS.filter((p) => showAll || forYou(PLAN_AREAS[p.id], settings.areas));
 
@@ -71,6 +74,13 @@ export default function Routines({
 
       {where === "desk" && (
         <div className="routine-list">
+          <button className="card build-card" onClick={() => setBuilder("new")}>
+            <span className="rt-emoji big">＋</span>
+            <span>
+              <b>Build your own routine</b>
+              <small>Pick the moves you like, in your order.</small>
+            </span>
+          </button>
           {routines.map((r) => (
             <Card key={r.id} className="routine-card" style={{ ["--g1" as string]: r.gradient[0], ["--g2" as string]: r.gradient[1] }}>
               <div className="rc-head">
@@ -92,14 +102,22 @@ export default function Routines({
                   ⏱ {fmtDuration(routineSeconds(r, level))} · {r.exercises.length} moves
                   {r.exercises.every((id) => EXERCISES[id].discreet) && " · office-friendly"}
                 </span>
-                <button className="btn primary" onClick={() => onStart(r.id)}>
-                  ▶ Start
-                </button>
+                <span className="btn-row" style={{ margin: 0 }}>
+                  {r.custom && (
+                    <button className="btn ghost" onClick={() => setBuilder(doc.custom.find((x) => x.id === r.id) ?? r)}>
+                      Edit
+                    </button>
+                  )}
+                  <button className="btn primary" onClick={() => onStart(r.id)}>
+                    ▶ Start
+                  </button>
+                </span>
               </div>
             </Card>
           ))}
         </div>
       )}
+      {builder && <RoutineBuilder edit={builder === "new" ? undefined : builder} onClose={() => setBuilder(null)} />}
 
       {where === "gym" && (
         <>

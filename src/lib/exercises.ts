@@ -1,4 +1,4 @@
-import type { Area, Exercise, Phase, Pose, Routine, Settings } from "./types";
+import type { Area, Doc, Exercise, Phase, Pose, Routine, Settings } from "./types";
 import type { SidePose } from "./gymAnim";
 import { LOWER_EXERCISES, LOWER_KIND } from "./lower";
 
@@ -10,6 +10,7 @@ export const AREAS: { id: Area; name: string; emoji: string; blurb: string }[] =
   { id: "lower-back", name: "Lower back", emoji: "🦴", blurb: "Aches after sitting" },
   { id: "hips", name: "Hips & glutes", emoji: "🍑", blurb: "Tight hips, numb bum" },
   { id: "legs", name: "Legs & calves", emoji: "🦵", blurb: "Tight or achy calves, heavy legs" },
+  { id: "tension", name: "Stress & tension", emoji: "😮‍💨", blurb: "Clenched jaw, tension headaches, tight shoulders" },
 ];
 export const AREA_NAME = Object.fromEntries(AREAS.map((a) => [a.id, a.name])) as Record<Area, string>;
 
@@ -27,6 +28,10 @@ const UPPER_AREAS: Record<string, Area[]> = {
   "w-to-y": ["upper-back"],
   thoracic: ["upper-back", "lower-back"],
   "tuck-hold": ["neck"],
+  breathing: ["tension"],
+  "shrug-drop": ["tension", "upper-back"],
+  "jaw-release": ["tension"],
+  "skull-release": ["tension", "neck"],
 };
 const UPPER_EASIER: Record<string, string> = {
   "chin-tuck": "nod",
@@ -41,6 +46,70 @@ const UPPER_EASIER: Record<string, string> = {
 };
 
 const UPPER: Record<string, Exercise> = {
+  breathing: {
+    id: "breathing",
+    name: "Slow Breathing",
+    tagline: "Switch off the stress response",
+    view: "front",
+    howTo: ["Sit tall, one hand on your belly if you like.", "Breathe in slowly through your nose, letting your belly rise, not your shoulders.", "Breathe out even more slowly, letting your shoulders sink."],
+    cue: "In through the nose. Long, slow breath out.",
+    sides: false,
+    reps: 4,
+    cycle: [
+      { label: "Breathe in", sec: 4, pose: { sy: -2 } },
+      { label: "Breathe out", sec: 6, pose: { sy: 3 } },
+    ],
+    discreet: true,
+    targets: "Breathing muscles & nervous system",
+  },
+  "shrug-drop": {
+    id: "shrug-drop",
+    name: "Shrug & Drop",
+    tagline: "Let go of shoulder tension",
+    view: "front",
+    howTo: ["Sit tall with your arms relaxed.", "Lift both shoulders up toward your ears and squeeze.", "Then let them drop completely, like putting down heavy bags."],
+    cue: "Squeeze up… and let it all go.",
+    sides: false,
+    reps: 5,
+    cycle: [
+      { label: "Shrug up", sec: 3, pose: { sy: -14 } },
+      { label: "Drop", sec: 3, pose: { sy: 3 } },
+    ],
+    discreet: true,
+    targets: "Upper traps & shoulders",
+  },
+  "jaw-release": {
+    id: "jaw-release",
+    name: "Jaw Release",
+    tagline: "Unclench without noticing",
+    view: "front",
+    howTo: ["Rest the tip of your tongue just behind your top teeth.", "Let your mouth open slowly, keeping your tongue there.", "Close gently and let your teeth stay slightly apart."],
+    cue: "Tongue up, open slowly, teeth apart.",
+    sides: false,
+    reps: 5,
+    cycle: [
+      { label: "Open slowly", sec: 3, pose: { fy: 3 } },
+      { label: "Relax", sec: 3, pose: {} },
+    ],
+    discreet: true,
+    targets: "Jaw muscles (masseter)",
+  },
+  "skull-release": {
+    id: "skull-release",
+    name: "Skull-Base Release",
+    tagline: "Ease a tension headache",
+    view: "side",
+    howTo: ["Sit tall and look straight ahead.", "Make a tiny nod, as if saying 'yes' with just your head, while gliding it slightly back.", "Feel the stretch where your skull meets your neck. Release and repeat."],
+    cue: "Tiny nod. Long at the back of the neck.",
+    sides: false,
+    reps: 6,
+    cycle: [
+      { label: "Small nod", sec: 3, pose: { hr: 10, hx: -4 } },
+      { label: "Release", sec: 2, pose: {} },
+    ],
+    discreet: true,
+    targets: "Suboccipitals (base of the skull)",
+  },
   "chin-tuck": {
     id: "chin-tuck",
     name: "Chin Tucks",
@@ -348,6 +417,17 @@ ROUTINES.push(
     gradient: ["#fde68a", "#fb923c"],
   },
   {
+    id: "tension",
+    name: "Tension Relief",
+    blurb: "Two minutes to unclench: breath, jaw, shoulders and the base of your skull.",
+    emoji: "😮‍💨",
+    areas: ["tension"],
+    exercises: ["breathing", "shrug-drop", "jaw-release", "skull-release", "side-tilt"],
+    reps: { breathing: 3 },
+    holdSec: { "side-tilt": 15 },
+    gradient: ["#a5b4fc", "#67e8f9"],
+  },
+  {
     id: "lower",
     name: "Hips & Lower Back",
     blurb: "Undo a day in the chair: hips, glutes and lower back.",
@@ -369,8 +449,23 @@ ROUTINES.push(
   },
 );
 
-/** Your areas and the moves you've said hurt (Settings). */
-export type Prefs = Pick<Settings, "areas" | "skip"> & { showAll?: boolean };
+/** Your areas, the moves you've said hurt, seated-only, and your own routines. */
+export type Prefs = Pick<Settings, "areas" | "skip"> & { showAll?: boolean; seatedOnly?: boolean; custom?: Routine[] };
+
+/** Everything routine choices depend on, from your saved data. */
+export function prefsOf(d: Pick<Doc, "settings" | "custom">): Prefs {
+  return { ...d.settings, custom: d.custom };
+}
+
+/** Seated-only: each standing move becomes a seated one. */
+export const SEATED_SWAP: Record<string, string> = {
+  "calf-raise": "ankle-pumps",
+  "calf-stretch": "seated-hamstring",
+  "standing-hip-flexor": "figure-4",
+  "standing-back-extension": "seated-pelvic-tilt",
+  "reach-up": "chest-opener",
+};
+export const isStanding = (id: string) => id in SEATED_SWAP;
 
 /** Does this routine / exercise help one of your areas? (No areas picked = everything is yours.) */
 export function forYou(areas: Area[] | undefined, mine: Area[] | undefined) {
@@ -386,6 +481,7 @@ const MIX_PICKS: Record<Area, string[]> = {
   "lower-back": ["seated-pelvic-tilt", "standing-back-extension"],
   hips: ["figure-4", "standing-hip-flexor", "glute-squeeze"],
   legs: ["ankle-pumps", "calf-raise", "seated-hamstring"],
+  tension: ["breathing", "shrug-drop", "jaw-release"],
 };
 
 /** A short routine made from your areas: about 2 moves each, never more than 6 moves. */
@@ -396,7 +492,7 @@ export function myMix(prefs?: Partial<Prefs>): Routine {
   for (const a of areas) {
     let n = 0;
     for (const id of MIX_PICKS[a]) {
-      const swap = resolveSkip(id, prefs?.skip);
+      const swap = resolveSkip(prefs?.seatedOnly ? (SEATED_SWAP[id] ?? id) : id, prefs?.skip);
       if (swap && !ids.includes(swap) && n < per) {
         ids.push(swap);
         n++;
@@ -427,27 +523,90 @@ export function resolveSkip(id: string, skip?: string[]): string | null {
   return cur && !skip?.includes(cur) ? cur : null;
 }
 
-/** A routine with the moves you said hurt swapped out. */
-export function withoutSkipped(r: Routine, skip?: string[]): Routine {
-  if (!skip?.length) return r;
+/** A routine with the moves you said hurt swapped out (and standing moves made seated, if you asked). */
+export function withoutSkipped(r: Routine, skip?: string[], seatedOnly?: boolean): Routine {
+  if (!skip?.length && !seatedOnly) return r;
   const ids: string[] = [];
   for (const id of r.exercises) {
-    const x = resolveSkip(id, skip);
+    const x = resolveSkip(seatedOnly ? (SEATED_SWAP[id] ?? id) : id, skip);
     if (x && !ids.includes(x)) ids.push(x);
   }
-  return ids.length ? { ...r, exercises: ids } : r;
+  const out = ids.length ? { ...r, exercises: ids } : r;
+  return seatedOnly && r.standing ? { ...out, standing: false, name: `${r.name} (seated)` } : out;
+}
+
+/** Your own routines (the ones you haven't removed). */
+export function customRoutines(prefs?: Partial<Prefs>): Routine[] {
+  return (prefs?.custom ?? []).filter((r) => !r.deleted && r.exercises.length > 0);
 }
 
 export function getRoutine(id: string, prefs?: Partial<Prefs>): Routine {
-  const r = id === "mix" ? myMix(prefs) : (ROUTINES.find((x) => x.id === id) ?? ROUTINES[0]);
-  return withoutSkipped(r, prefs?.skip);
+  const r =
+    id === "mix"
+      ? myMix(prefs)
+      : id === "plan"
+        ? planRoutine(prefs, planWeek(prefs as Settings))
+        : (customRoutines(prefs).find((x) => x.id === id) ?? ROUTINES.find((x) => x.id === id) ?? ROUTINES[0]);
+  return withoutSkipped(r, prefs?.skip, prefs?.seatedOnly);
 }
 
-/** Routines for your areas first (then the rest, if you want to see everything). */
+/* ---------------- the 4-week plan ---------------- */
+
+export const PLAN_WEEKS = [
+  { title: "Week 1: Wake it up", blurb: "Gentle moves and stretches to loosen up. Short holds, nothing hard.", level: 1 as const },
+  { title: "Week 2: Build the habit", blurb: "Standard holds. The goal this week is showing up most days.", level: 2 as const },
+  { title: "Week 3: Add strength", blurb: "A strength move joins in, because strong muscles hold good posture for you.", level: 2 as const },
+  { title: "Week 4: Make it stick", blurb: "Longer holds and more reps. This is the version you keep doing.", level: 3 as const },
+];
+
+/** Which week of the plan you're in (1-4; 5 = finished, keep going). 0 = not started. */
+export function planWeek(s: Pick<Settings, "planOn" | "planStart"> | undefined, today?: string): number {
+  if (!s?.planOn || !s.planStart) return 0;
+  const t = today ?? new Date().toISOString().slice(0, 10);
+  const days = Math.floor((Date.parse(`${t}T12:00:00Z`) - Date.parse(`${s.planStart}T12:00:00Z`)) / 86_400_000);
+  return Math.max(1, Math.min(5, Math.floor(days / 7) + 1));
+}
+
+/** Strength moves added from week 3, one per area (first one that suits). */
+const PLAN_STRENGTH: Record<Area, string> = {
+  neck: "tuck-hold",
+  "upper-back": "w-to-y",
+  "lower-back": "glute-squeeze",
+  hips: "glute-squeeze",
+  legs: "calf-raise",
+  tension: "squeeze",
+};
+
+/** Today's plan session: your mix, gentler at first, with a strength move from week 3. */
+export function planRoutine(prefs: Partial<Prefs> | undefined, week: number): Routine {
+  const w = Math.max(1, Math.min(4, week || 1));
+  const mix = myMix(prefs);
+  let ids = [...mix.exercises];
+  if (w === 1) ids = ids.filter((id) => KIND[id] !== "strength" || id === "chin-tuck").slice(0, 5);
+  if (w >= 3) {
+    const areas = prefs?.areas?.length ? prefs.areas : (["neck", "upper-back"] as Area[]);
+    const extra = resolveSkip(PLAN_STRENGTH[areas[0]], prefs?.skip);
+    if (extra && !ids.includes(extra)) ids = [...ids.slice(0, 5), extra];
+  }
+  const info = PLAN_WEEKS[w - 1];
+  return {
+    ...mix,
+    id: "plan",
+    name: week >= 5 ? "Your plan: keep it up" : `Plan · ${info.title.split(": ")[1]}`,
+    blurb: week >= 5 ? "You finished the 4 weeks. This is your keep-going version." : info.blurb,
+    emoji: "🗓️",
+    exercises: ids.length ? ids : mix.exercises,
+    level: week >= 5 ? 3 : info.level,
+    gradient: ["#86efac", "#3b82f6"],
+  };
+}
+
+/** Routines for your areas first (your own ones at the top; then the rest, if you want to see everything). */
 export function routinesFor(prefs: Partial<Prefs>): { mine: Routine[]; other: Routine[] } {
   const all = [...(prefs.areas && prefs.areas.length > 0 ? [myMix(prefs)] : []), ...ROUTINES];
-  const mine = all.filter((r) => forYou(r.areas, prefs.areas)).map((r) => withoutSkipped(r, prefs.skip));
-  const other = all.filter((r) => !forYou(r.areas, prefs.areas));
+  const fix = (r: Routine) => withoutSkipped(r, prefs.skip, prefs.seatedOnly);
+  const mine = [...customRoutines(prefs), ...all.filter((r) => forYou(r.areas, prefs.areas))].map(fix);
+  const other = all.filter((r) => !forYou(r.areas, prefs.areas)).map(fix);
   return { mine, other };
 }
 
@@ -515,6 +674,10 @@ export const KIND: Record<string, "strength" | "stretch" | "mobility"> = {
   nod: "mobility",
   rolls: "mobility",
   thoracic: "mobility",
+  breathing: "mobility",
+  "shrug-drop": "mobility",
+  "jaw-release": "mobility",
+  "skull-release": "mobility",
   ...LOWER_KIND,
 };
 
@@ -545,6 +708,7 @@ function scaleReps(id: string, reps: number, level: Level) {
 
 /** Expand a routine into a flat, timed list of steps that the player runs through. */
 export function buildTimeline(routine: Routine, level: Level = 2): Step[] {
+  if (routine.level) level = routine.level;
   const steps: Step[] = [];
   routine.exercises.forEach((id, exIndex) => {
     const ex = EXERCISES[id];

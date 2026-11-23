@@ -4,6 +4,7 @@ import DesktopDownload from "./DesktopDownload";
 import DesktopUpdates from "./DesktopUpdates";
 import NotifCheck from "./NotifCheck";
 import PhoneLink from "./PhoneLink";
+import { quietFor } from "@/lib/quiet";
 import { useEffect, useState } from "react";
 import { Card, Chips, Toggle, hourLabel } from "./ui";
 import { AREAS, EXERCISES, LEVEL_INFO, ROUTINES, buildTimeline, getRoutine, myMix, type Level } from "@/lib/exercises";
@@ -127,6 +128,12 @@ export default function SettingsView({
           })}
         </div>
         <Toggle label="Also show exercises for other areas" on={s.showAll} onChange={(v) => updateSettings({ showAll: v })} />
+        <Toggle
+          label="Seated only"
+          hint="No standing moves: each one is swapped for a seated version (also for the quick stretch)."
+          on={s.seatedOnly}
+          onChange={(v) => updateSettings({ seatedOnly: v })}
+        />
         {s.areas.length > 0 && <span className="row-hint">My Mix right now: {myMix(s).exercises.map((id) => EXERCISES[id].name).join(", ")}.</span>}
         {s.skip.length > 0 && (
           <div className="field-block">
@@ -147,6 +154,58 @@ export default function SettingsView({
           <button className="btn ghost" onClick={onRedoSetup}>
             Redo the setup
           </button>
+        </div>
+      </Card>
+
+      <Card>
+        <h3 className="card-title">🗓️ 4-week plan</h3>
+        <Toggle
+          label="Follow the 4-week plan"
+          hint="A session a day from your areas: gentle in week 1, stronger each week."
+          on={s.planOn}
+          onChange={(v) =>
+            updateSettings(v ? { planOn: true, planStart: s.planStart ?? new Date().toISOString().slice(0, 10), defaultRoutine: "plan" } : { planOn: false, defaultRoutine: s.defaultRoutine === "plan" ? "mix" : s.defaultRoutine })
+          }
+        />
+        <div className={s.planOn ? "" : "dim"}>
+          <div className="field-block">
+            <span className="row-label">Days a week to aim for</span>
+            <Chips options={[3, 4, 5, 6, 7]} value={s.planPerWeek} onChange={(v) => updateSettings({ planPerWeek: v })} format={(v) => `${v} days`} />
+          </div>
+          {s.planOn && s.planStart && (
+            <div className="btn-row">
+              <button
+                className="btn ghost"
+                onClick={() => {
+                  if (confirm("Start the plan again from week 1?")) updateSettings({ planStart: new Date().toISOString().slice(0, 10) });
+                }}
+              >
+                Start again from week 1
+              </button>
+            </div>
+          )}
+        </div>
+      </Card>
+
+      <Card>
+        <h3 className="card-title">🔕 Quiet times</h3>
+        <Toggle
+          label="Stay quiet during calls and presentations"
+          hint="Desktop app: no reminders or pop-ups while another app uses your camera or microphone, or while you present or use a full-screen app. Posture is still measured."
+          on={s.quietCalls}
+          onChange={(v) => updateSettings({ quietCalls: v })}
+        />
+        <div className="field-block">
+          <span className="row-label">Quiet right now</span>
+          <Chips
+            options={[0, 30, 60, 120]}
+            value={meta.quietUntil && meta.quietUntil > Date.now() ? -1 : 0}
+            onChange={(v) => quietFor(v || null)}
+            format={(v) => (v === 0 ? (meta.quietUntil && meta.quietUntil > Date.now() ? "End quiet" : "Off") : v < 60 ? `${v} min` : `${v / 60} h`)}
+          />
+          {meta.quietUntil && meta.quietUntil > Date.now() && (
+            <span className="row-hint">Quiet until {new Date(meta.quietUntil).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}.</span>
+          )}
         </div>
       </Card>
 
@@ -240,6 +299,17 @@ export default function SettingsView({
           <div className={s.standDeskOn ? "" : "dim"}>
             <Chips options={[30, 45, 60, 90]} value={s.standDeskMin} onChange={(v) => updateSettings({ standDeskMin: v })} format={(v) => `switch every ${fmtEvery(v)}`} />
           </div>
+        </div>
+
+        <div className="rem-block">
+          <span className="row-label">📱 Phone posture check (on your phone)</span>
+          <Chips options={[0, 30, 60, 120]} value={s.phoneCheckMin} onChange={(v) => updateSettings({ phoneCheckMin: v })} format={(v) => (v === 0 ? "Off" : `every ${fmtEvery(v)}`)} />
+          <Toggle
+            label="Lift-your-phone nudge"
+            hint="On a phone, while Upright is open: if you hold it low for a minute, a gentle nudge. (Phones only let apps like this read the tilt while they're open.)"
+            on={meta.phoneNudge !== false}
+            onChange={(v) => setMeta({ phoneNudge: v })}
+          />
         </div>
 
         <div className="field-block">
@@ -424,10 +494,12 @@ export default function SettingsView({
         <div className="field-block">
           <span className="row-label">Main routine</span>
           <Chips
-            options={["mix", ...ROUTINES.map((r) => r.id)]}
+            options={[...(s.planOn ? ["plan"] : []), "mix", ...doc.custom.filter((r) => !r.deleted).map((r) => r.id), ...ROUTINES.map((r) => r.id)]}
             value={s.defaultRoutine}
             onChange={(v) => updateSettings({ defaultRoutine: v })}
-            format={(id) => (id === "mix" ? "✨ My Mix" : ROUTINES.find((r) => r.id === id)!.name)}
+            format={(id) =>
+              id === "plan" ? "🗓️ My plan" : id === "mix" ? "✨ My Mix" : (doc.custom.find((r) => r.id === id)?.name ?? ROUTINES.find((r) => r.id === id)?.name ?? id)
+            }
           />
           <span className="row-hint">What &ldquo;Start&rdquo; and the exercise-break reminder open. My Mix is built from your areas.</span>
         </div>

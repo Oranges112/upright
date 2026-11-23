@@ -6,6 +6,7 @@ import MiniWidget from "./MiniWidget";
 import { syncWidgetTheme, useWidgetWindow } from "@/lib/widget";
 import Today from "./Today";
 import Setup from "./Setup";
+import { PhoneNudge } from "./PhonePosture";
 import Routines from "./Routines";
 import Progress from "./Progress";
 import SettingsView from "./SettingsView";
@@ -16,7 +17,7 @@ import { getPlan } from "@/lib/gym";
 import GuardView, { STATUS_UI, useGuard } from "./GuardView";
 import { guard } from "@/lib/guard";
 import { Card } from "./ui";
-import { getRoutine, fmtDuration, routineSeconds } from "@/lib/exercises";
+import { getRoutine, fmtDuration, prefsOf, routineSeconds } from "@/lib/exercises";
 import { getConfig, getDoc, getMeta, initStore, linkDevice, cleanCode, setMeta, useConfig, useDoc, useMeta } from "@/lib/store";
 import { REMINDER_TEXT, onReminder, reminderDone, snoozeReminder, standText, startReminders, type ReminderKind } from "@/lib/reminders";
 import { todayKey } from "@/lib/stats";
@@ -105,7 +106,7 @@ export default function App() {
     const url = new URL(location.href);
     const start = url.searchParams.get("start");
     if (start) {
-      setReady(getRoutine(start === "default" ? getDoc().settings.defaultRoutine : start, getDoc().settings));
+      setReady(getRoutine(start === "default" ? getDoc().settings.defaultRoutine : start, prefsOf(getDoc())));
       url.searchParams.delete("start");
       history.replaceState(null, "", url.pathname + url.hash);
     }
@@ -135,7 +136,7 @@ export default function App() {
     const onMsg = (e: MessageEvent) => {
       const kind = (e.data?.kind ?? "break") as ReminderKind;
       if (e.data?.type === "snooze") snoozeReminder(kind);
-      if (e.data?.type === "start") setReady(getRoutine(kind === "stretch" ? "stretch" : getDoc().settings.defaultRoutine, getDoc().settings));
+      if (e.data?.type === "start") setReady(getRoutine(kind === "stretch" ? "stretch" : getDoc().settings.defaultRoutine, prefsOf(getDoc())));
     };
     navigator.serviceWorker?.addEventListener("message", onMsg);
 
@@ -164,7 +165,7 @@ export default function App() {
     sound.unlock(); // user gesture → audio allowed
     setReady(null);
     setDue(null);
-    const r = getRoutine(id, getDoc().settings);
+    const r = getRoutine(id, prefsOf(getDoc()));
     if (r.id === "stretch") reminderDone("stretch");
     setPlaying(r);
   }
@@ -264,6 +265,7 @@ export default function App() {
       )}
       {widgetWin && createPortal(<MiniWidget today={today} />, widgetWin.document.body)}
 
+      {!playing && !gymPlan && <PhoneNudge />}
       {showSetup && (
         <Setup
           onDone={(first) => {

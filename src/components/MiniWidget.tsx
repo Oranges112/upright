@@ -108,7 +108,9 @@ export default function MiniWidget({ today, mode = "pip" }: { today: string; mod
             ? `Holding for ${fmtMin(goodFor)}`
             : "Keep it up"
           : g.status === "uncalibrated"
-            ? "then tap here to calibrate"
+            ? g.learning != null
+              ? `Learning your posture… ${Math.round(g.learning * 100)}%`
+              : "then tap here to calibrate"
             : g.status === "moved"
             ? "Sit tall, tap to recalibrate"
             : g.status === "calibrating"

@@ -457,6 +457,21 @@ const PAUSES = [
   [120, "2 hours"],
 ];
 
+function quietItems() {
+  return [
+    {
+      label: "🔕 Quiet (no reminders or pop-ups)",
+      submenu: [
+        { label: "For 30 minutes", click: () => send("quiet:30") },
+        { label: "For 1 hour", click: () => send("quiet:60") },
+        { label: "For 2 hours", click: () => send("quiet:120") },
+        { type: "separator" },
+        { label: "End quiet time", click: () => send("quiet:0") },
+      ],
+    },
+  ];
+}
+
 function pauseItems() {
   if (paused) return [{ label: "▶ Turn Posture Guard back on", click: () => send("resume") }];
   return [
@@ -483,6 +498,7 @@ function quickMenu() {
     { label: "🧍 Quick stretch (1 min)", click: () => openFullApp("?start=stretch") },
     { label: "🧘 Neck break", click: () => openFullApp("?start=default") },
     { type: "separator" },
+    ...quietItems(),
     ...pauseItems(),
     { label: "Recalibrate (sit tall first)", click: () => send("calibrate") },
     { type: "separator" },
@@ -499,6 +515,7 @@ function menu() {
     { label: "🧍 Quick stretch (1 min)", click: () => openFullApp("?start=stretch") },
     { label: "🧘 Neck break", click: () => openFullApp("?start=default") },
     { type: "separator" },
+    ...quietItems(),
     ...pauseItems(),
     { label: "Recalibrate (sit tall first)", click: () => send("calibrate") },
     { label: "Test a nudge", click: () => send("test") },
@@ -592,10 +609,80 @@ ipcMain.on("notify", (_e, n) => {
 /* ---------- are you at the computer? (a break away from the desk counts as your stretch) ---------- */
 ipcMain.handle("idle", () => {
   try {
-    return { sec: powerMonitor.getSystemIdleTime(), locked: powerMonitor.getSystemIdleState(60) === "locked" };
+    return { sec: powerMonitor.getSystemIdleTime(), locked: powerMonitor.getSystemIdleState(60) === "locked", busy: busy.on, why: busy.why };
   } catch {
-    return { sec: 0, locked: false };
+    return { sec: 0, locked: false, busy: busy.on, why: busy.why };
   }
+});
+
+/* ---------- on a call, presenting, or in a full-screen app? (stay quiet) ---------- */
+// Windows: another app using the camera or microphone (Windows keeps a record of which apps are
+// using them right now), or Windows' own "busy" states: presenting, full-screen app or game.
+// Mac: an app keeping the display awake (calls, presentations and videos do that).
+let busy = { on: false, why: "" };
+let busyProc = null;
+
+function startBusyWatch() {
+  if (process.platform === "win32") {
+    const ps = String.raw`
+$ErrorActionPreference = 'SilentlyContinue'
+Add-Type -Namespace U -Name N -MemberDefinition '[DllImport("shell32.dll")] public static extern int SHQueryUserNotificationState(out int s);'
+while ($true) {
+  $s = 0; [void][U.N]::SHQueryUserNotificationState([ref]$s)
+  $use = @()
+  foreach ($dev in 'webcam','microphone') {
+    Get-ChildItem "HKCU:\Software\Microsoft\Windows\CurrentVersion\CapabilityAccessManager\ConsentStore\$dev" -Recurse | ForEach-Object {
+      $p = Get-ItemProperty $_.PSPath
+      if ($p.LastUsedTimeStart -and $p.LastUsedTimeStop -eq 0 -and $_.PSChildName -notmatch 'Upright|electron') { $use += $dev }
+    }
+  }
+  Write-Output ("{0}|{1}" -f $s, (($use | Select-Object -Unique) -join ','))
+  Start-Sleep -Seconds 15
+}`;
+    try {
+      busyProc = spawn("powershell.exe", ["-NoProfile", "-NonInteractive", "-WindowStyle", "Hidden", "-Command", ps], { windowsHide: true });
+      let buf = "";
+      busyProc.stdout.on("data", (d) => {
+        buf += d.toString();
+        const lines = buf.split(/\r?\n/);
+        buf = lines.pop();
+        for (const line of lines) {
+          const [state, use] = line.trim().split("|");
+          const st = Number(state);
+          const calls = (use || "").length > 0;
+          // 2 busy (full screen), 3 full-screen game / video, 4 presentation mode
+          const why = calls ? "on a call" : st === 4 ? "presenting" : st === 2 || st === 3 ? "in a full-screen app" : "";
+          busy = { on: !!why, why };
+        }
+      });
+      busyProc.on("exit", () => {
+        busyProc = null;
+        busy = { on: false, why: "" };
+      });
+    } catch {}
+  } else if (MAC) {
+    const check = () =>
+      execFile("/usr/bin/pmset", ["-g", "assertions"], (err, out) => {
+        if (err) return;
+        // e.g. "pid 812(zoom.us): [0x…] 00:12:03 PreventUserIdleDisplaySleep named: "…""
+        const who = String(out)
+          .split("\n")
+          .filter((l) => /PreventUserIdleDisplaySleep/.test(l) && /pid \d+\(/.test(l) && !/Upright|Electron/i.test(l))
+          .map((l) => (l.match(/pid \d+\(([^)]+)\)/) || [])[1])
+          .filter(Boolean);
+        const call = who.some((n) => /zoom|teams|facetime|webex|slack|meet|skype|discord|whatsapp/i.test(n));
+        const show = who.some((n) => /keynote|powerpoint/i.test(n));
+        const why = call ? "on a call" : show ? "presenting" : who.length ? "watching or presenting" : "";
+        busy = { on: !!why, why };
+      });
+    check();
+    setInterval(check, 20_000);
+  }
+}
+app.on("will-quit", () => {
+  try {
+    busyProc?.kill();
+  } catch {}
 });
 
 /* ---------- desktop settings shown in the app's Settings ---------- */
@@ -664,6 +751,7 @@ if (!app.requestSingleInstanceLock()) {
     createWidget();
     createTray();
     setupUpdates();
+    startBusyWatch();
     // launched by a link (e.g. "Open Upright" on the website)
     const first = linkFrom(process.argv) || pendingLink;
     if (first) widget.once("ready-to-show", () => handleLink(first));

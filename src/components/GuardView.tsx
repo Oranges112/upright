@@ -4,6 +4,7 @@ import DesktopDownload from "./DesktopDownload";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { Card, Chips, Toggle } from "./ui";
 import { openCamera } from "@/lib/face";
+import DeskCheck from "./DeskCheck";
 import { BAD, ISSUE, guard, type GuardState, type GuardStatus } from "@/lib/guard";
 import { setMeta, useDoc, useMeta } from "@/lib/store";
 import { useCameraShape } from "./FormCheck";
@@ -80,6 +81,7 @@ export default function GuardView({ today }: { today: string }) {
     const i = setInterval(() => setNow(Date.now()), 20_000);
     return () => clearInterval(i);
   }, []);
+  const [desk, setDesk] = useState(false);
   const pausedMin = g.pausedUntil && g.pausedUntil > now ? Math.ceil((g.pausedUntil - now) / 60_000) : 0;
   const ui = STATUS_UI[g.status];
 
@@ -150,7 +152,13 @@ export default function GuardView({ today }: { today: string }) {
               <video ref={videoRef} autoPlay muted playsInline />
               <div className={`cam-status tone-${ui.tone}`}>
                 <i />
-                {g.exercising ? "Paused while you exercise" : g.status === "calibrating" ? `Calibrating… ${Math.ceil(g.calibrateLeft)}` : ui.label}
+                {g.exercising
+                  ? "Paused while you exercise"
+                  : g.status === "calibrating"
+                    ? `Calibrating… ${Math.ceil(g.calibrateLeft)}`
+                    : g.status === "uncalibrated" && g.learning != null
+                      ? `Learning your good posture… ${Math.round(g.learning * 100)}%`
+                      : ui.label}
                 {g.turned && <small className="cam-count">· 👀 turned, still checking</small>}
                 {bad && <small className="cam-count">· chime in {Math.max(0, Math.ceil(delay - g.badFor))}s</small>}
               </div>
@@ -236,6 +244,15 @@ export default function GuardView({ today }: { today: string }) {
       </div>
 
       <div className="guard-side">
+      <button className="learn-link card" onClick={() => setDesk(true)}>
+        <span className="guide-emoji sm">📐</span>
+        <span>
+          <b>Check my desk setup</b>
+          <small>1 minute: screen height, distance, and the rest of your desk.</small>
+        </span>
+        <em>›</em>
+      </button>
+      {desk && <DeskCheck onClose={() => setDesk(false)} />}
       <DesktopDownload />
 
       <div className="stat-grid three">
@@ -292,6 +309,12 @@ export default function GuardView({ today }: { today: string }) {
             format={(v) => (v < 60 ? `${v}s` : `${v / 60} min`)}
           />
         </div>
+        <Toggle
+          label="Calibrate automatically"
+          hint="Learns your good posture in the first 20 seconds, and again if your camera moves. Turn off to always tap Calibrate yourself."
+          on={meta.autoCalibrate !== false}
+          onChange={(v) => setMeta({ autoCalibrate: v })}
+        />
         <Toggle label="Chime on a nudge" on={meta.guardChime !== false} onChange={(v) => setMeta({ guardChime: v })} />
         <Toggle label="Pop-up notification on a nudge" hint="Shows even when you're in another app." on={meta.guardPopup !== false} onChange={(v) => setMeta({ guardPopup: v })} />
         <div className="field-block">

@@ -12,7 +12,8 @@ export type BusMsg =
   | { t: "guard:hello"; from: string }
   | { t: "guard:cmd"; from: string; to: string; cmd: string; arg?: number | boolean }
   | { t: "due"; from: string; kind: string }
-  | { t: "done"; from: string; kind: string };
+  | { t: "done"; from: string; kind: string }
+  | { t: "busy"; from: string; on: boolean; why: string };
 
 type Payload<M> = M extends unknown ? Omit<M, "from"> : never;
 

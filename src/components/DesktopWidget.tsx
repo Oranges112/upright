@@ -7,6 +7,7 @@ import { todayKey } from "@/lib/stats";
 import MiniWidget from "./MiniWidget";
 import { desktopBridge } from "@/lib/desktop";
 import { startReminders } from "@/lib/reminders";
+import { quietFor } from "@/lib/quiet";
 
 /**
  * The whole page inside the desktop app's floating dot. It runs Posture Guard and the reminders
@@ -38,6 +39,7 @@ export default function DesktopWidget() {
       else if (cmd === "test") guard.testNudge();
       else if (cmd === "exercise-on") guard.setPaused(true);
       else if (cmd === "exercise-off") guard.setPaused(false);
+      else if (cmd.startsWith("quiet:")) quietFor(Number(cmd.slice(6)) || null);
     });
     return () => guard.stop();
     // eslint-disable-next-line react-hooks/exhaustive-deps

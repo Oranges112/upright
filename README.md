@@ -2,10 +2,10 @@
 
 A free posture coach that runs in your browser and installs like an app on your phone and computer, with a desktop app for Windows and Mac. The code is public and free for non-commercial use ([license](#license)).
 
-- It asks **what bothers you** (neck, shoulders & upper back, lower back, hips, legs & calves) and only shows exercises for those.
+- It asks **what bothers you** (neck, shoulders & upper back, lower back, hips, legs & calves, stress & tension) and only shows exercises for those, with an optional **4-week plan** that starts gentle and gets stronger.
 - It **reminds you** to take exercise breaks, stand up for a **quick stretch**, rest your eyes and switch your standing desk, each as often as you choose (or not at all).
 - It **does the exercises with you**, with an animated coach, countdowns, chimes and an optional voice.
-- Your **webcam can watch for slouching** while you work, with everything processed on your own device.
+- Your **webcam can watch for slouching** while you work (it learns your good posture by itself), with everything processed on your own device. It also **checks your desk setup** and stays **quiet during calls and presentations**.
 - It has **gym workouts for posture** and a **Learn** section explaining every exercise.
 - It **tracks real progress**: how each area feels over time, sitting time, streaks, a posture score, self-tests, and a before/after report you can show a physio.
 
@@ -32,17 +32,22 @@ Nothing to install or sign up for. Open the link on your phone or computer, and 
 
 | | |
 |---|---|
+| **🗓️ 4-week plan** | A session a day built from your areas: gentle in week 1, a strength move from week 3, longer holds in week 4, with a weekly goal you choose. |
+| **⭐ Your own routines** | Build your own: pick the moves you like, put them in order, name it. They sync like everything else. |
 | **🎯 Made for what bothers you** | First-time setup asks what bothers you (neck, shoulders & upper back, lower back, hips & glutes, legs & calves), runs a quick safety check, and builds **My Mix** from your areas. You only see exercises for your areas (with a switch to see everything). |
-| **🏃 Guided routines** | Desk Quickie (~2 min), Stealth Mode (discreet, for the office), Desk Reset (~3 min), Full Fix (~8 min), Hips & Lower Back, Legs & Calves, and a 1-minute standing **Quick Stretch**. 22 physio-style exercises: chin tucks, ear-to-shoulder, shoulder squeezes, W-to-Y, chest opener, plus calf raises, ankle pumps, calf and hamstring stretches, hip flexor stretch, figure-4, glute squeezes, pelvic tilts and back bends. A **This hurts** button swaps any move for a gentler one from then on. |
+| **🏃 Guided routines** | Desk Quickie (~2 min), Stealth Mode (discreet, for the office), Desk Reset (~3 min), Full Fix (~8 min), Hips & Lower Back, Legs & Calves, and a 1-minute standing **Quick Stretch**. 26 physio-style exercises: chin tucks, ear-to-shoulder, shoulder squeezes, W-to-Y, chest opener, plus calf raises, ankle pumps, calf and hamstring stretches, hip flexor stretch, figure-4, glute squeezes, pelvic tilts and back bends, plus **Tension Relief** (slow breathing, shrug & drop, jaw release, skull-base release). A **This hurts** button swaps any move for a gentler one from then on, and **seated-only mode** swaps every standing move for a seated one. |
 | **🎬 Exercises done with you** | An animated figure moves in sync with a countdown ring, rep dots and left/right switching. Gentle bell chimes, an optional ambient pad and voice coach. Keyboard shortcuts and screen wake-lock. |
 | **🏋️ Gym workouts** | Three posture plans (Upper back, Back + core & hips, Quick 20) with 12 animated gym moves: rows, face pulls, pulldowns, Y-raises, head lifts, glute bridges, dead bugs and stretches. Tap "Set done" for a rest timer, timed holds for stretches, and remembered weights. |
 | **📚 Learn** | Read about any exercise without doing it: how to do it, why it helps, where to feel it, common mistakes, easier and harder versions. Plus short guides on desk setup, phone posture, sleep, standing posture, gym rules, timelines and when to see a physio. |
 | **💪 Intensity levels** | Gentle → Athlete. Strength moves get longer holds and more reps, stretches stay capped at a safe 30 s, and mobility moves stay easy. After each session it asks "Too easy / Just right / Too hard" and adjusts. |
 | **🔔 Reminders** | Exercise breaks, a **quick stretch** (stand up and move, hourly by default), 20-20-20 **eye breaks** and **standing-desk** switches. Each has its own on/off switch and interval, inside your active hours and days, with your choice of snooze length and chime. Time away from the desk (computer idle or locked, or Posture Guard can't see you) counts as a break, and there's a daily **sitting time** count. Only one window gives reminders, however many are open. |
-| **🛡️ Posture Guard** | Your webcam spots a forward head, slumping, chin dropping and head tilt, then nudges you with a chime and notification. It keeps checking while you look at a second screen or turn away, and tells you to recalibrate if your laptop or camera moves. Runs **100% on-device** (MediaPipe); no video ever leaves your computer. |
+| **🛡️ Posture Guard** | Your webcam spots a forward head, slumping, chin dropping and head tilt, then nudges you with a chime and notification. It **learns your good posture by itself** in the first 20 seconds (and again if your camera moves), or you can calibrate by hand. It keeps checking while you look at a second screen or turn away, and tells you to recalibrate if your laptop or camera moves. Runs **100% on-device** (MediaPipe); no video ever leaves your computer. |
 | **🪟 Floating widget** | A tiny always-on-top pill shows your posture live over any app, with what you're doing wrong and how to fix it (Chrome/Edge desktop). |
 | **📈 Progress** | Streaks, XP and levels, a posture score, heatmap, weekly practice vs. neck-comfort chart, plus three self-tests: neck endurance hold, wall test, and a **side-profile photo** that finds your ear and shoulder automatically, measures your forward-head angle and checks your back, hips and knees. A **before/after slider** lines up your photos so you can see the change, with a monthly reminder to retake it. |
 | **📄 Before & after report** | Compares your first week with the last 7 days, with photos side by side. Print or save as PDF. |
+| **📐 Desk setup check** | One minute with your camera: is your screen at eye level, about an arm's length away and straight in front of you? Plus a short checklist for chair, feet, elbows and glare. |
+| **🔕 Quiet times** | The desktop app holds reminders and pop-ups while you're on a call (another app is using your camera or microphone), presenting, or in a full-screen app. Or tap "Quiet for 1 hour" anywhere. |
+| **📱 Phone posture** | On your phone: see how many kilos your neck carries the way you hold your phone, a gentle "lift your phone" nudge while Upright is open, and an optional phone-posture reminder. |
 | **📈 How it feels** | Tap a face for each of your areas (after a session or once a day/week, your choice) and Progress shows each one's trend. A Monday summary looks back at your week. |
 | **🔄 Sync without accounts** | Scan a QR code with your phone to link it to your computer; streaks, sessions and settings merge automatically. Photos stay on the device. |
 | **🌙 Dark mode, offline, installable** | A PWA that works offline and installs from the browser. |
@@ -51,7 +56,8 @@ Nothing to install or sign up for. Open the link on your phone or computer, and 
 
 A tiny see-through dot that sits on top of every app. It's faded green while your posture is good, and pops out red with what's wrong ("Head forward · Slide your chin back") when you slouch. Drag it anywhere.
 
-- **Click the dot** for quick actions: quick stretch, neck break, pause Posture Guard (15 min to 2 hours, or until you turn it back on), recalibrate, open Upright. Right-click it (or the tray / menu-bar icon) for everything else.
+- **Click the dot** for quick actions: quick stretch, neck break, quiet time (no reminders or pop-ups), pause Posture Guard (15 min to 2 hours, or until you turn it back on), recalibrate, open Upright.
+- **Stays quiet on calls and while presenting** (Windows: when another app uses the camera or microphone, or you present or play full screen; Mac: when a call, presentation or video keeps the screen awake). Right-click it (or the tray / menu-bar icon) for everything else.
 - **Click the Upright icon** to open the full app. When it starts with your computer, it's just the dot, quietly.
 - **The dot and the app are one.** The dot runs Posture Guard and the reminders; the app's Guard page shows and controls the same thing, and settings stay in step everywhere.
 - Reminders and nudges arrive as normal **Windows / Mac notifications**. When the computer is idle or locked, that time counts as a break.
@@ -138,6 +144,8 @@ On one computer, every open Upright window (the desktop dot, the app window, bro
 | `src/lib/reminders.ts` | Every reminder (breaks, quick stretch, eyes, standing desk), away-from-desk breaks, sitting time. |
 | `src/lib/schedule.ts` | Reminder timing, shared by browser and server. |
 | `src/components/Setup.tsx` | First-time setup: your areas, safety check, how it feels, your reminders. |
+| `src/lib/quiet.ts` | Quiet times (calls, presentations, "quiet for 1 hour"). |
+| `src/lib/phone.ts` | Phone posture: tilt sensor and how much your neck carries. |
 | `desktop/main.js` | The Windows / Mac app: floating dot, tray, notifications, updates. |
 | `src/lib/stats.ts` | Streaks, XP, posture score. |
 | `src/lib/sound.ts` | Web Audio chimes, ambient pad, voice. |

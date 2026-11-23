@@ -1,6 +1,6 @@
 import { bad, envClean, redis, getMeta, listUsers, loadDoc, pushEnabled, pushToUser, setMeta } from "@/lib/server";
 import { isReminderDue } from "@/lib/schedule";
-import { fmtDuration, getRoutine, routineSeconds } from "@/lib/exercises";
+import { fmtDuration, getRoutine, prefsOf, routineSeconds } from "@/lib/exercises";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -39,7 +39,7 @@ async function handle(req: Request) {
       const lastSessionAt = last ? last.startedAt + last.durationSec * 1000 : undefined;
       if (!isReminderDue(doc.settings, { lastSessionAt, lastReminderAt: meta.lastReminderAt, snoozeUntil: meta.snoozeUntil }, now)) continue;
 
-      const r = getRoutine(doc.settings.defaultRoutine, doc.settings);
+      const r = getRoutine(doc.settings.defaultRoutine, prefsOf(doc));
       const [title, body] = MESSAGES[Math.floor(Math.random() * MESSAGES.length)];
       const n = await pushToUser(code, {
         title,

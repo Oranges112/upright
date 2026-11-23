@@ -11,9 +11,18 @@ export interface DesktopBridge {
   contextMenu: () => void;
   /** desktop app 1.4+: native notifications, how long the computer has been idle, settings */
   notify?: (n: DesktopNotice) => void;
-  idle?: () => Promise<{ sec: number; locked: boolean }>;
+  idle?: () => Promise<IdleInfo>;
   /** the quick menu (left click on the dot) */
   quickMenu?: () => void;
+}
+
+/** Is anyone at the computer, and are they on a call / presenting? (desktop app 1.4+; busy from 1.5) */
+export interface IdleInfo {
+  sec: number;
+  locked: boolean;
+  busy?: boolean;
+  /** "on a call", "presenting", "in a full-screen app" */
+  why?: string;
 }
 
 export interface DesktopNotice {
@@ -57,7 +66,7 @@ export interface AppBridge {
   onUpdate?: (cb: (u: UpdateInfo) => void) => () => void;
   /** desktop app 1.4+ */
   notify?: (n: DesktopNotice) => void;
-  idle?: () => Promise<{ sec: number; locked: boolean }>;
+  idle?: () => Promise<IdleInfo>;
   getPrefs?: () => Promise<DesktopPrefs>;
   setPrefs?: (p: Partial<DesktopPrefs>) => void;
 }

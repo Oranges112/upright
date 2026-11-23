@@ -5,7 +5,7 @@ import { appBridge, desktopBridge } from "./desktop";
 import { getMeta } from "./store";
 
 /** What a notification is about. Clicking it does the matching thing. */
-export type NotifyKind = "guard" | "break" | "stretch" | "eye" | "stand" | "test";
+export type NotifyKind = "guard" | "break" | "stretch" | "eye" | "stand" | "phone" | "test";
 
 export interface NotifyOptions {
   title: string;

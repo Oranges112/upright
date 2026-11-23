@@ -60,7 +60,7 @@ export interface Exercise {
 }
 
 /** Body areas you can pick in setup. Exercises and routines are filtered by these. */
-export type Area = "neck" | "upper-back" | "lower-back" | "hips" | "legs";
+export type Area = "neck" | "upper-back" | "lower-back" | "hips" | "legs" | "tension";
 
 export interface Routine {
   id: string;
@@ -72,6 +72,12 @@ export interface Routine {
   areas?: Area[];
   /** done standing up (the quick stretch) */
   standing?: boolean;
+  /** play it at this intensity instead of your usual one (the 4-week plan) */
+  level?: 1 | 2 | 3 | 4;
+  /** one you built yourself (synced; removed ones are kept as `deleted` so every device hears about it) */
+  custom?: boolean;
+  updatedAt?: number;
+  deleted?: boolean;
   /** overrides for reps per exercise */
   reps?: Record<string, number>;
   /** overrides for "Hold" phase length per exercise */
@@ -169,6 +175,17 @@ export interface Settings {
   weeklyOn: boolean;
   /** exercises you said hurt: never offered again (swapped for the easier one) */
   skip: string[];
+  /** no standing moves: each is swapped for a seated one */
+  seatedOnly: boolean;
+  /** the 4-week plan: on, and the day it started (YYYY-MM-DD) */
+  planOn: boolean;
+  planStart?: string;
+  /** sessions a week the plan asks for */
+  planPerWeek: number;
+  /** desktop app: hold reminders and nudges while you're on a call or presenting */
+  quietCalls: boolean;
+  /** phone: remind you to check how you're holding your phone (minutes, 0 = off) */
+  phoneCheckMin: number;
   updatedAt: number;
 }
 
@@ -178,4 +195,6 @@ export interface Doc {
   checkins: CheckIn[];
   tests: PostureTest[];
   guard: GuardDay[];
+  /** routines you built */
+  custom: Routine[];
 }

@@ -15,18 +15,21 @@ import { onBus, post } from "./bus";
 import { notify } from "./notify";
 import { sound } from "./sound";
 import { guard } from "./guard";
-import { appBridge, desktopBridge } from "./desktop";
-import { fmtDuration, getRoutine, routineSeconds } from "./exercises";
+import { appBridge, desktopBridge, type IdleInfo } from "./desktop";
+import { quietReason, setBusy } from "./quiet";
+import { isPhone } from "./phone";
+import { fmtDuration, getRoutine, prefsOf, routineSeconds } from "./exercises";
 import type { Settings } from "./types";
 import type { Meta } from "./store";
 
-export type ReminderKind = "break" | "stretch" | "eye" | "stand";
+export type ReminderKind = "break" | "stretch" | "eye" | "stand" | "phone";
 
 export const REMINDER_TEXT: Record<ReminderKind, { title: string; body: string }> = {
   break: { title: "Time for a neck break 🧘", body: "Sit tall. Two minutes, that's all." },
   stretch: { title: "Quick stretch 🧍", body: "Stand up for a minute: reach up tall, roll your shoulders, shake out your legs." },
   eye: { title: "Eye break 👀", body: "Look at something about 6 metres (20 feet) away for 20 seconds. Blink a few times." },
   stand: { title: "Switch it up 🔁", body: "Time to change position at your standing desk." },
+  phone: { title: "Phone check 📱", body: "How are you holding your phone? Lift it toward eye level and tuck your chin." },
 };
 
 export function standText(standingNow: boolean | undefined) {
@@ -38,6 +41,9 @@ export function stretchReminder(s: Settings, m: Meta): IntervalReminder {
 }
 export function eyeReminder(s: Settings, m: Meta): IntervalReminder {
   return { on: s.eyeOn, everyMin: s.eyeMin, last: [m.lastEyeAt, m.lastAwayBreakAt], snoozeUntil: m.eyeSnoozeUntil };
+}
+export function phoneReminder(s: Settings, m: Meta): IntervalReminder {
+  return { on: s.phoneCheckMin > 0 && isPhone(), everyMin: s.phoneCheckMin, last: [m.lastPhoneCheckAt] };
 }
 export function standReminder(s: Settings, m: Meta): IntervalReminder {
   return { on: s.standDeskOn, everyMin: s.standDeskMin, last: [m.lastStandSwitchAt] };
@@ -60,6 +66,7 @@ export function reminderDone(kind: ReminderKind) {
   const now = Date.now();
   if (kind === "stretch") setMeta({ lastStretchAt: now, stretchSnoozeUntil: undefined });
   if (kind === "eye") setMeta({ lastEyeAt: now, eyeSnoozeUntil: undefined });
+  if (kind === "phone") setMeta({ lastPhoneCheckAt: now });
   // (stand: the switch was already counted when the reminder fired)
   post({ t: "done", kind });
   dueHandlers.forEach((h) => h(null, kind));
@@ -72,6 +79,7 @@ export function snoozeReminder(kind: ReminderKind) {
   if (kind === "stretch") setMeta({ stretchSnoozeUntil: until });
   if (kind === "eye") setMeta({ eyeSnoozeUntil: until });
   if (kind === "stand") setMeta({ lastStandSwitchAt: until - getDoc().settings.standDeskMin * 60_000 });
+  if (kind === "phone") setMeta({ lastPhoneCheckAt: until - getDoc().settings.phoneCheckMin * 60_000 });
   post({ t: "done", kind });
   dueHandlers.forEach((h) => h(null, kind));
 }
@@ -89,7 +97,7 @@ function fire(kind: ReminderKind) {
   let text = REMINDER_TEXT[kind];
   let routine: string | undefined;
   if (kind === "break") {
-    const r = getRoutine(s.defaultRoutine, s);
+    const r = getRoutine(s.defaultRoutine, prefsOf(d));
     routine = r.id;
     text = { title: text.title, body: `${r.name} · ${fmtDuration(routineSeconds(r, s.level))}. Sit tall and let's go.` };
   }
@@ -102,7 +110,7 @@ function fire(kind: ReminderKind) {
 }
 
 /** How long the computer has been idle, if we can tell (desktop app 1.4+). */
-async function idleInfo(): Promise<{ sec: number; locked: boolean } | null> {
+async function idleInfo(): Promise<IdleInfo | null> {
   const f = desktopBridge()?.idle ?? appBridge()?.idle;
   if (!f) return null;
   try {
@@ -128,6 +136,8 @@ async function tick() {
 
   // ---- are you at the desk? ----
   const idle = await idleInfo();
+  // on a call / presenting (desktop app): tell every window, so nudges stay quiet too
+  if (idle && typeof idle.busy === "boolean") setBusy(idle.busy, idle.why ?? "");
   const g = guard.getState();
   const guardOn = g.status !== "off" && g.status !== "error";
   const guardAway = guardOn && g.status === "away";
@@ -156,8 +166,8 @@ async function tick() {
     lastFlush = now;
   }
 
-  // ---- reminders (not while you're away: the break is happening anyway) ----
-  if (away) return;
+  // ---- reminders (not while you're away: the break is happening anyway; not during quiet times) ----
+  if (away || quietReason(now)) return;
   if (isReminderDue(s, { lastSessionAt: lastSessionEnd(d), lastReminderAt: m.lastReminderAt, snoozeUntil: m.snoozeUntil }, now)) {
     setMeta({ lastReminderAt: now, snoozeUntil: undefined });
     fire("break");
@@ -171,6 +181,11 @@ async function tick() {
   if (intervalDue(s, eyeReminder(s, m), now)) {
     setMeta({ lastEyeAt: now, eyeSnoozeUntil: undefined });
     fire("eye");
+    return;
+  }
+  if (intervalDue(s, phoneReminder(s, m), now)) {
+    setMeta({ lastPhoneCheckAt: now });
+    fire("phone");
     return;
   }
   if (intervalDue(s, standReminder(s, m), now)) {
@@ -196,6 +211,7 @@ export function startReminders() {
     if (!m.lastStretchReminderAt) init.lastStretchReminderAt = now;
     if (!m.lastEyeAt) init.lastEyeAt = now;
     if (!m.lastStandSwitchAt) init.lastStandSwitchAt = now;
+    if (!m.lastPhoneCheckAt) init.lastPhoneCheckAt = now;
     if (Object.keys(init).length) setMeta(init);
     void tick();
     setInterval(() => void tick(), TICK * 1000);

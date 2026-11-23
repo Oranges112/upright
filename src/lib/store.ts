@@ -1,7 +1,7 @@
 "use client";
 
 import { useSyncExternalStore } from "react";
-import type { Area, CheckIn, Doc, GuardDay, PostureTest, SessionLog, Settings, TestType } from "./types";
+import type { Area, CheckIn, Doc, GuardDay, PostureTest, Routine, SessionLog, Settings, TestType } from "./types";
 import { emptyDoc, mergeDocs, normalize } from "./merge";
 import { dayKey } from "./schedule";
 import { STATIC, api, apiBase } from "./base";
@@ -18,6 +18,8 @@ export interface GuardBase {
   roll?: number;
   yaw?: number;
   cx?: number;
+  /** made automatically (Posture Guard learned it), not by tapping Calibrate */
+  auto?: boolean;
   /** turn-proof measures (see Sample in face.ts); missing on older calibrations */
   em?: number;
   pitchM?: number;
@@ -62,6 +64,14 @@ export interface Meta {
   weeklySeen?: string;
   /** your own sync server (Settings → Phone & computer), for copies without one built in */
   apiUrl?: string;
+  /** Posture Guard learns your good posture by itself (default on) */
+  autoCalibrate?: boolean;
+  /** all reminders and nudges quiet until (ms): "I'm in a meeting" */
+  quietUntil?: number;
+  /** phone posture: last reminder, the "lift your phone" nudge while open (default on), last nudge */
+  lastPhoneCheckAt?: number;
+  phoneNudge?: boolean;
+  lastPhoneNudgeAt?: number;
 }
 
 export interface ServerConfig {
@@ -285,6 +295,13 @@ export function addSitTime(sec: number, streakSec: number) {
 export function updateSettings(patch: Partial<Settings>) {
   const d = latestDoc();
   setDoc({ ...d, settings: { ...d.settings, ...patch, updatedAt: Date.now() } });
+}
+
+/** Save a routine you built (or remove it: `deleted: true`). Synced like everything else. */
+export function saveCustom(r: Routine) {
+  const d = latestDoc();
+  const next = { ...r, custom: true, updatedAt: Date.now() };
+  setDoc({ ...d, custom: [...d.custom.filter((x) => x.id !== r.id), next] });
 }
 
 /** Replace this device's data with a (merged) backup. */

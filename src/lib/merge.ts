@@ -35,12 +35,17 @@ export function defaultSettings(): Settings {
     painCheckDays: 1,
     weeklyOn: true,
     skip: [],
+    seatedOnly: false,
+    planOn: false,
+    planPerWeek: 5,
+    quietCalls: true,
+    phoneCheckMin: 0,
     updatedAt: 0,
   };
 }
 
 export function emptyDoc(): Doc {
-  return { settings: defaultSettings(), sessions: [], checkins: [], tests: [], guard: [] };
+  return { settings: defaultSettings(), sessions: [], checkins: [], tests: [], guard: [], custom: [] };
 }
 
 /** Union by id. Records that carry `updatedAt` keep the newest copy; others: b wins. */
@@ -71,6 +76,11 @@ export function mergeDocs(a: Doc | null | undefined, b: Doc | null | undefined):
     checkins: unionById(a.checkins, b.checkins, (x) => x.at),
     tests: unionById(a.tests, b.tests, (x) => x.at),
     guard: unionById(a.guard, b.guard, (x) => x.day),
+    custom: unionById(
+      (a.custom ?? []).map((r) => ({ ...r, updatedAt: r.updatedAt ?? 0 })),
+      (b.custom ?? []).map((r) => ({ ...r, updatedAt: r.updatedAt ?? 0 })),
+      (x) => x.updatedAt ?? 0,
+    ),
   });
 }
 
@@ -82,5 +92,6 @@ export function normalize(d: Partial<Doc> | null | undefined): Doc {
     checkins: Array.isArray(d?.checkins) ? d!.checkins : [],
     tests: Array.isArray(d?.tests) ? d!.tests : [],
     guard: Array.isArray(d?.guard) ? d!.guard : [],
+    custom: Array.isArray(d?.custom) ? d!.custom : [],
   };
 }

@@ -162,6 +162,30 @@ export const COACHING: Record<string, Coaching> = {
     ],
     avoid: "Don't push so hard that your neck strains or shakes.",
   },
+  breathing: {
+    why: "Stress makes you breathe fast and high in your chest, which works the neck and shoulder muscles all day long. Slow belly breathing, with a longer breath out, tells your nervous system to calm down, and those muscles let go.",
+    feel: "Your belly rising and falling, your shoulders staying still and slowly getting heavier.",
+    tips: ["Breathe out for longer than you breathe in.", "Keep your shoulders still: the belly does the work.", "Let your jaw and tongue relax too."],
+    avoid: "Don't force big gulps of air. Slow and comfortable is the point.",
+  },
+  "shrug-drop": {
+    why: "Stress parks your shoulders up near your ears without you noticing. Squeezing them up on purpose, then dropping them, helps the muscles find 'off' again.",
+    feel: "Tension at the top of your shoulders, then a warm, heavy release when you drop them.",
+    tips: ["Squeeze up hard for a moment, then let go completely.", "Breathe out as you drop.", "Notice where 'down' is, and keep them there."],
+    avoid: "Don't rush the drop into a slump. Stay sitting tall.",
+  },
+  "jaw-release": {
+    why: "Clenching your jaw (often without knowing, when stressed or concentrating) tightens the muscles of your jaw, temples and neck and is a common cause of tension headaches.",
+    feel: "A gentle stretch in front of your ears and in your cheeks.",
+    tips: ["Tongue tip stays behind your top teeth: it keeps the jaw opening straight.", "Open slowly, only as wide as is comfortable.", "Through the day: lips together, teeth apart."],
+    avoid: "Don't open wide or fast, and stop if your jaw clicks or hurts.",
+  },
+  "skull-release": {
+    why: "The small muscles where your skull meets your neck get tight when your head pokes forward, and they're a well-known trigger for tension headaches. This tiny nod stretches them gently.",
+    feel: "A gentle stretch right at the base of your skull, at the back.",
+    tips: ["It's a very small movement: think 'yes' with just your head.", "Glide slightly back as you nod.", "Breathe out as you nod."],
+    avoid: "Don't drop your whole neck forward. Only the head nods.",
+  },
   ...LOWER_COACHING,
 };
 
